@@ -91,7 +91,7 @@ pip install conan==2.0.17
 Configure Conan
 ===============
 conan profile detect --force
-conan remote add conancenter https://center.conan.io
+conan remote add conancenter <https://center.conan.io>
 
 Build OpenSSL
 =============
@@ -340,21 +340,17 @@ openssl/*:enable_unit_test=True/False # Unit testing
 -----------------
 
 ### Quantitative Goals
+
 - **Build Time**: 40-60% reduction achieved
-
 - **Resource Efficiency**: 30-50% cost savings
-
 - **Cache Hit Rate**: >70% target met
-
 - **Security Coverage**: 100% dependency scanning
 
 ### Qualitative Benefits
+
 - **Developer Experience**: Simplified workflow
-
 - **Maintainability**: Reduced configuration complexity
-
 - **Reliability**: Consistent cross-platform builds
-
 - **Security Posture**: Enhanced supply chain security
 
 🎉 Conclusion
