@@ -175,8 +175,8 @@ class OpenSSLConan(ConanFile):
         
     def layout(self):
         # Use basic layout for custom build system
-        self.folders.build = "build"
-        self.folders.source = "src"
+        # OpenSSL builds in-tree, so we don't separate source and build
+        pass
         
     def generate(self):
         # Generate build environment
@@ -248,22 +248,22 @@ class OpenSSLConan(ConanFile):
     def build(self):
         # Configure OpenSSL
         configure_args = self._get_configure_command()
-        self.run(" ".join(configure_args), cwd=self.source_folder)
+        self.run(" ".join(configure_args))
         
         # Build
         jobs = os.getenv("CONAN_CPU_COUNT", "1")
-        self.run(f"make -j{jobs}", cwd=self.source_folder)
+        self.run(f"make -j{jobs}")
         
         # Run tests if enabled
         if self.options.enable_unit_test or os.getenv("OSSL_RUN_CI_TESTS"):
-            self.run("make test", cwd=self.source_folder)
+            self.run("make test")
             
     def package(self):
         # Install OpenSSL
-        self.run("make install_sw install_ssldirs", cwd=self.source_folder)
+        self.run("make install_sw install_ssldirs")
         
         # Copy license
-        copy(self, "LICENSE.txt", src=self.source_folder, dst=os.path.join(self.package_folder, "licenses"))
+        copy(self, "LICENSE.txt", src=".", dst=os.path.join(self.package_folder, "licenses"))
         
         # Generate SBOM (Software Bill of Materials)
         self._generate_sbom()
