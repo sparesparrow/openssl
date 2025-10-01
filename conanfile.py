@@ -149,17 +149,34 @@ class OpenSSLConan(ConanFile):
         package_manager.Zypper(self).install(["gcc", "gcc-c++", "make", "perl"])
         
     def set_version(self):
-        # Dynamically determine version from VERSION.dat
-        if os.path.exists("VERSION.dat"):
-            content = load(self, "VERSION.dat")
+        """Dynamically determine version from VERSION.dat"""
+        version_file = os.path.join(self.recipe_folder, "VERSION.dat")
+        if not os.path.exists(version_file):
+            # Fallback for testing or if VERSION.dat is missing
+            self.output.warning("VERSION.dat not found, using default version 3.5.0")
+            self.version = "3.5.0"
+            return
+            
+        try:
+            content = load(self, version_file)
             version_match = re.search(r'MAJOR=(\d+)', content)
             minor_match = re.search(r'MINOR=(\d+)', content)  
             patch_match = re.search(r'PATCH=(\d+)', content)
             
             if version_match and minor_match and patch_match:
-                self.version = f"{version_match.group(1)}.{minor_match.group(1)}.{patch_match.group(1)}"
+                major = version_match.group(1)
+                minor = minor_match.group(1)
+                patch = patch_match.group(1)
+                self.version = f"{major}.{minor}.{patch}"
+                self.output.info(f"Detected OpenSSL version: {self.version}")
+            else:
+                raise ConanInvalidConfiguration("VERSION.dat exists but couldn't parse version numbers")
+        except Exception as e:
+            self.output.error(f"Failed to read VERSION.dat: {e}")
+            raise
                 
     def configure(self):
+        """Configure and validate build options"""
         # Configure build options based on settings
         if self.settings.build_type == "Debug":
             self.options.enable_crypto_mdebug = True
@@ -171,6 +188,48 @@ class OpenSSLConan(ConanFile):
         # Performance builds  
         if self.settings.build_type == "Release" and self.settings.arch in ["x86_64", "armv8"]:
             self.options.no_asm = False
+    
+    def validate(self):
+        """Validate configuration options for conflicts"""
+        # Check for conflicting options
+        if self.options.fips and self.options.no_asm:
+            raise ConanInvalidConfiguration(
+                "FIPS mode requires assembly optimizations. "
+                "Cannot use fips=True with no_asm=True. "
+                "Set no_asm=False or disable FIPS."
+            )
+        
+        if self.options.fips and self.settings.build_type == "Debug":
+            self.output.warning(
+                "FIPS validation may behave differently in Debug builds. "
+                "Consider using Release build_type for production FIPS deployments."
+            )
+        
+        # Sanitizers are mutually exclusive
+        sanitizers = [
+            self.options.enable_asan,
+            self.options.enable_msan,
+            self.options.enable_tsan
+        ]
+        if sum(sanitizers) > 1:
+            raise ConanInvalidConfiguration(
+                "Only one sanitizer can be enabled at a time. "
+                "Choose either ASAN, MSAN, or TSAN, not multiple."
+            )
+        
+        # Sanitizers don't work well with optimization
+        if any(sanitizers) and self.settings.build_type == "Release":
+            self.output.warning(
+                "Sanitizers work best with Debug builds. "
+                "Consider using build_type=Debug for sanitizer testing."
+            )
+        
+        # Check for no_threads with QUIC (QUIC needs threading)
+        if self.options.no_threads and self.options.enable_quic:
+            raise ConanInvalidConfiguration(
+                "QUIC protocol requires threading support. "
+                "Cannot use no_threads=True with enable_quic=True."
+            )
             
     def export_sources(self):
         # Export all source files
