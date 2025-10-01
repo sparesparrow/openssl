@@ -249,63 +249,85 @@ class OpenSSLConan(ConanFile):
         tc.generate()
         
     def _get_configure_command(self):
-        """Generate OpenSSL configure command based on options"""
-        args = ["./config", "--banner=Configured"]
-        
-        # Basic options
-        if not self.options.shared:
-            args.append("no-shared")
+        """Generate OpenSSL configure command based on options with error handling"""
+        try:
+            args = ["./config", "--banner=Configured"]
             
-        if self.options.fips:
-            args.append("enable-fips")
+            # Validate that config script exists
+            if not os.path.exists("./config"):
+                raise ConanInvalidConfiguration("OpenSSL config script not found in source directory")
             
-        if self.options.no_asm:
-            args.append("no-asm")
-            
-        if self.options.no_threads:
-            args.append("no-threads")
-            
-        # Crypto options
-        crypto_options = [
-            "bf", "cast", "des", "dh", "dsa", "hmac", "md2", "md4", "md5", 
-            "mdc2", "rc2", "rc4", "rc5", "rsa", "sha"
-        ]
-        
-        for option in crypto_options:
-            if getattr(self.options, f"no_{option}"):
-                args.append(f"no-{option}")
+            # Basic options
+            if not self.options.shared:
+                args.append("no-shared")
                 
-        # Enable options
-        enable_options = [
-            "weak_ssl_ciphers", "ssl3", "ssl3_method", "trace", "unit_test",
-            "ubsan", "asan", "msan", "tsan", "fuzzer_afl", "fuzzer_libfuzzer",
-            "external_tests", "buildtest_c++", "crypto_mdebug", 
-            "crypto_mdebug_backtrace", "lms", "quic", "h3demo", "demos"
-        ]
-        
-        for option in enable_options:
-            if getattr(self.options, f"enable_{option}"):
-                args.append(f"enable-{option.replace('_', '-')}")
+            if self.options.fips:
+                args.append("enable-fips")
+                self.output.info("FIPS mode enabled - ensure compliance requirements are met")
                 
-        # Directories
-        if self.options.openssldir:
-            args.append(f"--openssldir={self.options.openssldir}")
-        else:
-            args.append(f"--openssldir={os.path.join(self.package_folder, 'ssl')}")
+            if self.options.no_asm:
+                args.append("no-asm")
+                
+            if self.options.no_threads:
+                args.append("no-threads")
+                
+            # Crypto options
+            crypto_options = [
+                "bf", "cast", "des", "dh", "dsa", "hmac", "md2", "md4", "md5", 
+                "mdc2", "rc2", "rc4", "rc5", "rsa", "sha"
+            ]
             
-        args.append(f"--prefix={self.package_folder}")
-        
-        # Compiler flags
-        if self.settings.build_type == "Debug":
-            args.append("--debug")
-        elif self.settings.build_type == "Release":
-            args.append("--release")
+            for option in crypto_options:
+                try:
+                    if getattr(self.options, f"no_{option}", False):
+                        args.append(f"no-{option}")
+                except AttributeError:
+                    self.output.warning(f"Option 'no_{option}' not found, skipping")
+                    
+            # Enable options
+            enable_options = [
+                "weak_ssl_ciphers", "ssl3", "ssl3_method", "trace", "unit_test",
+                "ubsan", "asan", "msan", "tsan", "fuzzer_afl", "fuzzer_libfuzzer",
+                "external_tests", "buildtest_c++", "crypto_mdebug", 
+                "crypto_mdebug_backtrace", "lms", "quic", "h3demo", "demos"
+            ]
             
-        # Add strict warnings for CI builds
-        if os.getenv("OSSL_RUN_CI_TESTS"):
-            args.append("--strict-warnings")
+            for option in enable_options:
+                try:
+                    if getattr(self.options, f"enable_{option}", False):
+                        args.append(f"enable-{option.replace('_', '-')}")
+                except AttributeError:
+                    self.output.warning(f"Option 'enable_{option}' not found, skipping")
+                    
+            # Directories
+            if self.options.openssldir:
+                openssldir = str(self.options.openssldir)
+                if not os.path.isabs(openssldir):
+                    self.output.warning(f"openssldir '{openssldir}' is relative, consider using absolute path")
+                args.append(f"--openssldir={openssldir}")
+            else:
+                args.append(f"--openssldir={os.path.join(self.package_folder, 'ssl')}")
+                
+            args.append(f"--prefix={self.package_folder}")
             
-        return args
+            # Compiler flags
+            if self.settings.build_type == "Debug":
+                args.append("--debug")
+            elif self.settings.build_type == "Release":
+                args.append("--release")
+            else:
+                self.output.warning(f"Unknown build_type '{self.settings.build_type}', using default")
+                
+            # Add strict warnings for CI builds
+            if os.getenv("OSSL_RUN_CI_TESTS"):
+                args.append("--strict-warnings")
+                
+            self.output.info(f"Configure command: {' '.join(args)}")
+            return args
+            
+        except Exception as e:
+            self.output.error(f"Error generating configure command: {e}")
+            raise
         
     def build(self):
         # Configure OpenSSL
