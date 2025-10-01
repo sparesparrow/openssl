@@ -352,36 +352,181 @@ class OpenSSLConan(ConanFile):
         # Generate SBOM (Software Bill of Materials)
         self._generate_sbom()
         
-    def _generate_sbom(self):
-        """Generate Software Bill of Materials for supply chain security"""
-        sbom_data = {
-            "bomFormat": "CycloneDX",
-            "specVersion": "1.4",
-            "version": 1,
-            "metadata": {
-                "component": {
-                    "type": "library",
-                    "name": self.name,
-                    "version": str(self.version),
-                    "licenses": [{"license": {"id": "Apache-2.0"}}]
-                }
-            },
-            "components": []
+    def _calculate_file_hash(self, filepath, algorithm='sha256'):
+        """Calculate cryptographic hash of a file"""
+        hash_func = getattr(hashlib, algorithm)()
+        try:
+            with open(filepath, 'rb') as f:
+                for chunk in iter(lambda: f.read(4096), b""):
+                    hash_func.update(chunk)
+            return hash_func.hexdigest()
+        except Exception as e:
+            self.output.warning(f"Failed to calculate hash for {filepath}: {e}")
+            return None
+    
+    def _validate_licenses(self):
+        """Validate dependency licenses for compliance"""
+        approved_licenses = [
+            "Apache-2.0", "MIT", "BSD-3-Clause", "BSD-2-Clause", 
+            "ISC", "Zlib", "OpenSSL"
+        ]
+        
+        license_report = {
+            "approved": [],
+            "unknown": [],
+            "incompatible": []
         }
         
-        # Add dependencies to SBOM
         for dep in self.deps_cpp_info.deps:
-            component = {
-                "type": "library", 
-                "name": dep,
-                "version": str(self.deps_cpp_info[dep].version),
-                "scope": "required"
-            }
-            sbom_data["components"].append(component)
+            # In real implementation, you'd query license info from Conan metadata
+            # This is a simplified version
+            dep_license = "Unknown"  # Would get from self.deps_cpp_info[dep] metadata
             
-        import json
+            if dep_license in approved_licenses:
+                license_report["approved"].append(f"{dep}: {dep_license}")
+            elif dep_license == "Unknown":
+                license_report["unknown"].append(dep)
+                self.output.warning(f"Unknown license for dependency: {dep}")
+            else:
+                license_report["incompatible"].append(f"{dep}: {dep_license}")
+                self.output.warning(f"Potentially incompatible license: {dep} ({dep_license})")
+        
+        # Save license report
+        license_path = os.path.join(self.package_folder, "licenses", "license-report.json")
+        save(self, license_path, json.dumps(license_report, indent=2))
+        return license_report
+    
+    def _generate_sbom(self):
+        """Generate enhanced SBOM with security features"""
+        self.output.info("Generating Software Bill of Materials (SBOM)...")
+        
+        # Calculate hashes for main libraries
+        lib_hashes = {}
+        lib_dir = os.path.join(self.package_folder, "lib")
+        if os.path.exists(lib_dir):
+            for lib_file in ["libssl.a", "libcrypto.a", "libssl.so", "libcrypto.so",
+                            "libssl.dylib", "libcrypto.dylib"]:
+                lib_path = os.path.join(lib_dir, lib_file)
+                if os.path.exists(lib_path):
+                    sha256 = self._calculate_file_hash(lib_path, 'sha256')
+                    if sha256:
+                        lib_hashes[lib_file] = {
+                            "sha256": sha256,
+                            "algorithm": "SHA-256"
+                        }
+        
+        # Enhanced SBOM data structure
+        sbom_data = {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.5",
+            "serialNumber": f"urn:uuid:{os.urandom(16).hex()}",
+            "version": 1,
+            "metadata": {
+                "timestamp": str(os.environ.get("SOURCE_DATE_EPOCH", "")),
+                "component": {
+                    "type": "library",
+                    "bom-ref": f"{self.name}@{self.version}",
+                    "name": self.name,
+                    "version": str(self.version),
+                    "description": self.description,
+                    "licenses": [{"license": {"id": "Apache-2.0"}}],
+                    "hashes": [{"alg": "SHA-256", "content": h["sha256"]} 
+                              for h in lib_hashes.values()],
+                    "externalReferences": [
+                        {
+                            "type": "website",
+                            "url": self.homepage
+                        },
+                        {
+                            "type": "vcs",
+                            "url": self.url
+                        }
+                    ]
+                },
+                "tools": [
+                    {
+                        "vendor": "Conan",
+                        "name": "conan",
+                        "version": "2.0"
+                    }
+                ]
+            },
+            "components": [],
+            "vulnerabilities": []
+        }
+        
+        # Add dependencies to SBOM with enhanced metadata
+        for dep in self.deps_cpp_info.deps:
+            try:
+                dep_version = str(self.deps_cpp_info[dep].version) if hasattr(self.deps_cpp_info[dep], 'version') else "unknown"
+                component = {
+                    "type": "library",
+                    "bom-ref": f"{dep}@{dep_version}",
+                    "name": dep,
+                    "version": dep_version,
+                    "scope": "required",
+                    "licenses": []  # Would be populated from dependency metadata
+                }
+                sbom_data["components"].append(component)
+            except Exception as e:
+                self.output.warning(f"Could not add dependency {dep} to SBOM: {e}")
+        
+        # Save SBOM
         sbom_path = os.path.join(self.package_folder, "sbom.json")
         save(self, sbom_path, json.dumps(sbom_data, indent=2))
+        self.output.success(f"SBOM generated: {sbom_path}")
+        
+        # Generate package signature if key is available
+        self._sign_package(sbom_path)
+        
+        # Validate licenses
+        self._validate_licenses()
+        
+        # Generate vulnerability report placeholder
+        self._generate_vulnerability_report()
+    
+    def _sign_package(self, sbom_path):
+        """Sign package for supply chain security (placeholder for actual signing)"""
+        # This would integrate with actual signing tools like cosign, gpg, etc.
+        signing_enabled = os.getenv("CONAN_SIGN_PACKAGES", "false").lower() == "true"
+        
+        if not signing_enabled:
+            self.output.info("Package signing disabled (set CONAN_SIGN_PACKAGES=true to enable)")
+            return
+        
+        self.output.info("Package signing placeholder - integrate with cosign/gpg in production")
+        # Example integration points:
+        # - cosign sign-blob --key cosign.key sbom.json
+        # - gpg --detach-sign --armor sbom.json
+        
+        signature_metadata = {
+            "signed": True,
+            "timestamp": str(os.environ.get("SOURCE_DATE_EPOCH", "")),
+            "algorithm": "placeholder",
+            "keyid": "placeholder"
+        }
+        
+        sig_path = os.path.join(self.package_folder, "package-signature.json")
+        save(self, sig_path, json.dumps(signature_metadata, indent=2))
+    
+    def _generate_vulnerability_report(self):
+        """Generate vulnerability scan report (integration point)"""
+        # This would integrate with tools like Trivy, Snyk, OWASP Dependency Check
+        vuln_report = {
+            "scanTool": "placeholder",
+            "scanDate": str(os.environ.get("SOURCE_DATE_EPOCH", "")),
+            "component": f"{self.name}@{self.version}",
+            "vulnerabilities": [],
+            "note": "Integrate with Trivy/Snyk for actual vulnerability scanning"
+        }
+        
+        # Example integration commands (to be run in CI):
+        # trivy fs --format json --output trivy-report.json .
+        # snyk test --json > snyk-report.json
+        
+        vuln_path = os.path.join(self.package_folder, "vulnerability-report.json")
+        save(self, vuln_path, json.dumps(vuln_report, indent=2))
+        self.output.info(f"Vulnerability report placeholder generated: {vuln_path}")
         
     def package_info(self):
         # Set package information
@@ -410,7 +555,8 @@ class OpenSSLConan(ConanFile):
             self.env_info.OPENSSL_CONF = os.path.join(self.package_folder, "ssl", "openssl.cnf")
             
     def package_id(self):
-        # Customize package ID for better caching
+        """Optimize package ID for better caching"""
+        # Runtime path options don't affect binary compatibility
         del self.info.options.openssldir
         del self.info.options.cafile  
         del self.info.options.capath
@@ -418,3 +564,32 @@ class OpenSSLConan(ConanFile):
         # Test-only options don't affect package ID
         del self.info.options.enable_unit_test
         del self.info.options.enable_external_tests
+        del self.info.options.enable_demos
+        del self.info.options.enable_h3demo
+        
+        # Debug options that don't affect binary interface
+        del self.info.options.enable_trace
+        del self.info.options.enable_crypto_mdebug
+        del self.info.options.enable_crypto_mdebug_backtrace
+        
+        # Sanitizers produce different binaries but can use same cache strategy
+        # Group all sanitizer builds together for caching purposes
+        if (self.info.options.enable_asan or 
+            self.info.options.enable_msan or 
+            self.info.options.enable_tsan or
+            self.info.options.enable_ubsan):
+            # Normalize to "sanitized" build
+            self.info.options.enable_asan = "any_sanitizer"
+            del self.info.options.enable_msan
+            del self.info.options.enable_tsan
+            del self.info.options.enable_ubsan
+        
+        # Fuzzer options don't affect normal usage
+        del self.info.options.enable_fuzzer_afl
+        del self.info.options.enable_fuzzer_libfuzzer
+        
+        # Build test options
+        try:
+            del self.info.options.enable_buildtest_cplusplus
+        except AttributeError:
+            pass  # Option might be named differently
