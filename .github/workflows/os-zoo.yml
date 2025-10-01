@@ -139,8 +139,19 @@ jobs:
       run: git submodule update --init --depth 1 fuzz/corpora
     - name: install nasm
       run: |
-        choco install nasm
-        "C:\Program Files\NASM" | Out-File -FilePath "$env:GITHUB_PATH" -Append
+        # Download NASM directly (bypasses Chocolatey issues)
+        $url = "https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/win64/nasm-2.16.03-win64.zip"
+        $output = "nasm.zip"
+        Invoke-WebRequest -Uri $url -OutFile $output
+        
+        # Extract to C:\nasm
+        Expand-Archive -Path $output -DestinationPath "C:\nasm" -Force
+        
+        # Add to PATH
+        echo "C:\nasm" >> $env:GITHUB_PATH
+        
+        # Verify installation
+        C:\nasm\nasm.exe --version
     - name: prepare the build directory
       run: mkdir _build
     - name: config

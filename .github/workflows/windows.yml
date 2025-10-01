@@ -12,10 +12,15 @@ on: [pull_request, push]
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   shared:
     # Run a job for each of the specified target architectures:
     strategy:
+      max-parallel: 1
       matrix:
         platform:
           - arch: amd64
@@ -37,8 +42,19 @@ jobs:
       run: git submodule update --init --depth 1 fuzz/corpora
     - name: install nasm
       run: |
-        choco install nasm ${{ matrix.platform.arch == 'x86' && '--x86' || '' }}
-        "C:\Program Files${{ matrix.platform.arch == 'x86' && ' (x86)' || '' }}\NASM" | Out-File -FilePath "$env:GITHUB_PATH" -Append
+        # Download NASM directly (bypasses Chocolatey issues)
+        $url = "https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/win64/nasm-2.16.03-win64.zip"
+        $output = "nasm.zip"
+        Invoke-WebRequest -Uri $url -OutFile $output
+        
+        # Extract to C:\nasm
+        Expand-Archive -Path $output -DestinationPath "C:\nasm" -Force
+        
+        # Add to PATH
+        echo "C:\nasm" >> $env:GITHUB_PATH
+        
+        # Verify installation
+        C:\nasm\nasm.exe --version
     - name: prepare the build directory
       run: mkdir _build
     - name: config
@@ -55,6 +71,7 @@ jobs:
         call "${{ matrix.platform.vcvars }}"
         nmake /S
     - name: download coreinfo
+      if: github.event_name != 'pull_request'
       run: |
         mkdir _build\coreinfo
         Invoke-WebRequest -Uri "https://download.sysinternals.com/files/Coreinfo.zip" -outfile "_build\coreinfo\Coreinfo.zip"
@@ -111,14 +128,14 @@ jobs:
       working-directory: _build
       shell: cmd
       run: |
-        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        call "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Auxiliary\\Build\\vcvars64.bat"
         perl ..\Configure --banner=Configured --strict-warnings enable-demos no-makedepend no-shared no-fips enable-md2 enable-rc5 enable-ssl3 enable-ssl3-method enable-weak-ssl-ciphers enable-trace enable-crypto-mdebug -DOSSL_WINCTX=openssl VC-WIN64A-masm
         perl configdata.pm --dump
     - name: build
       working-directory: _build
       shell: cmd
       run: |
-        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        call "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Auxiliary\\Build\\vcvars64.bat"
         nmake /S
     - name: download coreinfo
       run: |
@@ -135,7 +152,7 @@ jobs:
       working-directory: _build
       shell: cmd
       run: |
-        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        call "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Auxiliary\\Build\\vcvars64.bat"
         nmake test VERBOSE_FAILURE=yes HARNESS_JOBS=4
 
   minimal:
@@ -150,14 +167,14 @@ jobs:
       working-directory: _build
       shell: cmd
       run: |
-        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        call "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Auxiliary\\Build\\vcvars64.bat"
         perl ..\Configure --banner=Configured --strict-warnings enable-demos no-makedepend no-bulk no-deprecated no-fips no-asm no-threads -DOPENSSL_SMALL_FOOTPRINT -DOSSL_WINCTX=openssl
         perl configdata.pm --dump
     - name: build
       working-directory: _build
       shell: cmd
       run: |
-        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        call "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Auxiliary\\Build\\vcvars64.bat"
         nmake
     - name: download coreinfo
       run: |
@@ -174,7 +191,7 @@ jobs:
       working-directory: _build
       shell: cmd
       run: |
-        call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+        call "C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise\\VC\\Auxiliary\\Build\\vcvars64.bat"
         nmake test VERBOSE_FAILURE=yes TESTS=-test_fuzz* HARNESS_JOBS=4
 
   cygwin:
