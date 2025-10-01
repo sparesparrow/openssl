@@ -6,7 +6,25 @@
 # https://www.openssl.org/source/license.html
 
 name: CIFuzz
-on: [pull_request, push]
+on:
+  # Only run on main branch pushes and when specifically requested
+  push:
+    branches: [ main, master ]
+  pull_request:
+    paths:
+      - 'fuzz/**'
+      - '.github/workflows/main.yml'
+  schedule:
+    # Run weekly on Sundays
+    - cron: '0 6 * * 0'
+  workflow_dispatch:
+    inputs:
+      fuzz-seconds:
+        description: 'Duration to run fuzzers (seconds)'
+        required: false
+        default: '300'
+        type: string
+
 permissions:
   contents: read
 
@@ -23,11 +41,11 @@ jobs:
       uses: google/oss-fuzz/infra/cifuzz/actions/run_fuzzers@master
       with:
         oss-fuzz-project-name: 'openssl'
-        fuzz-seconds: 600
+        fuzz-seconds: ${{ github.event.inputs.fuzz-seconds || '300' }}
         dry-run: false
     - name: Upload Crash
       uses: actions/upload-artifact@v4
       if: failure()
       with:
-        name: artifacts
+        name: cifuzz-artifacts
         path: ./out/artifacts
