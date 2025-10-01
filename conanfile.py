@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 OpenSSL Conan Package Recipe
-Modern dependency management for OpenSSL CI/CD pipeline
+Modern dependency management for OpenSSL CI/CD pipeline with enhanced security
 """
 
 from conan import ConanFile
@@ -9,13 +9,16 @@ from conan.tools.cmake import CMakeToolchain, CMakeDeps, cmake_layout
 from conan.tools.files import copy, save, load
 from conan.tools.scm import Git
 from conan.tools.system import package_manager
+from conan.errors import ConanInvalidConfiguration
 import os
 import re
+import hashlib
+import json
 
 
 class OpenSSLConan(ConanFile):
     name = "openssl"
-    version = "3.5.0"  # Will be dynamically determined
+    version = None  # Dynamically determined from VERSION.dat
     
     # Package metadata
     description = "OpenSSL is a robust, commercial-grade, full-featured toolkit for TLS and SSL protocols"
