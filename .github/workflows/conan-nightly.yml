@@ -1,0 +1,77 @@
+name: Conan Nightly Rebuild
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 2 AM UTC
+  workflow_dispatch:
+
+jobs:
+  get-changed-branches:
+    runs-on: ubuntu-latest
+    outputs:
+      branches: ${{ steps.branches.outputs.branches }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Get changed branches
+        id: branches
+        run: |
+          # Get all branches that have commits in the last 24 hours
+          BRANCHES=$(git for-each-ref --format='%(refname:short)' refs/remotes/origin | \
+            xargs -I {} git log --since="24 hours ago" --oneline origin/{} | \
+            cut -d' ' -f2- | sort -u | tr '\n' ' ')
+          
+          echo "branches=$BRANCHES" >> $GITHUB_OUTPUT
+          echo "Found branches: $BRANCHES"
+
+  rebuild-branches:
+    needs: get-changed-branches
+    runs-on: ubuntu-latest
+    if: needs.get-changed-branches.outputs.branches != ''
+    strategy:
+      matrix:
+        profile: [linux-gcc11, linux-clang15]
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.branch }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Set up Conan Python Environment
+        run: |
+          python scripts/setup-conan-python-env.py
+          python scripts/conan/conan_cli.py setup
+      
+      - name: Rebuild package
+        run: |
+          python scripts/conan/conan_cli.py install --profile=${{ matrix.profile }} --clean
+          python scripts/conan/conan_cli.py build --profile=${{ matrix.profile }}
+      
+      - name: Run tests
+        run: |
+          python scripts/conan/conan_cli.py test --profile=${{ matrix.profile }}
+      
+      - name: Upload nightly artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-${{ matrix.branch }}-${{ matrix.profile }}
+          path: |
+            build/
+            package/
+            test_results/
+
+  cleanup-old-artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clean up old artifacts
+        run: |
+          # This would typically clean up old artifacts from storage
+          echo "Cleaning up artifacts older than 30 days..."
+          # Add cleanup logic here

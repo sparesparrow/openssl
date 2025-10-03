@@ -1,0 +1,86 @@
+name: Conan Branch Compilation
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'conanfile.py'
+      - 'conanfile.txt'
+      - 'conan-recipes/**'
+      - 'scripts/conan/**'
+      - 'conan-dev/**'
+      - 'src/**'
+      - 'include/**'
+      - 'test/**'
+      - 'CMakeLists.txt'
+      - 'Makefile'
+      - 'configure'
+      - 'config'
+  workflow_dispatch:
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      openssl-changed: ${{ steps.changes.outputs.openssl }}
+      conan-changed: ${{ steps.changes.outputs.conan }}
+      tests-changed: ${{ steps.changes.outputs.tests }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect changes
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            openssl:
+              - 'crypto/**'
+              - 'ssl/**'
+              - 'apps/**'
+              - 'include/**'
+              - 'CMakeLists.txt'
+              - 'configure'
+              - 'config'
+            conan:
+              - 'conanfile.py'
+              - 'conanfile.txt'
+              - 'conan-recipes/**'
+            tests:
+              - 'test/**'
+              - 'fuzz/**'
+
+  compile-changes:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.openssl == 'true' || needs.detect-changes.outputs.conan == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        profile: [linux-gcc11, linux-clang15]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Set up Conan Python Environment
+        run: |
+          python scripts/setup-conan-python-env.py
+          python scripts/conan/conan_cli.py setup
+      
+      - name: Install dependencies
+        run: |
+          python scripts/conan/conan_cli.py install --profile=${{ matrix.profile }}
+      
+      - name: Build package
+        run: |
+          python scripts/conan/conan_cli.py build --profile=${{ matrix.profile }}
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: conan-build-${{ matrix.profile }}
+          path: |
+            build/
+            package/

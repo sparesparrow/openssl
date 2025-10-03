@@ -1,0 +1,137 @@
+name: Conan Release & Deploy
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'VERSION.dat'
+      - 'conanfile.py'
+      - 'conanfile.txt'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release'
+        required: true
+        default: 'auto'
+
+jobs:
+  prepare-release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      should-release: ${{ steps.version.outputs.should-release }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event.inputs.version }}" = "auto" ]; then
+            VERSION=$(cat VERSION.dat | tr -d '\n')
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          
+          # Check if this is a new version
+          if git tag | grep -q "^v$VERSION$"; then
+            echo "should-release=false" >> $GITHUB_OUTPUT
+          else
+            echo "should-release=true" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+          echo "Should release: ${{ steps.version.outputs.should-release }}"
+
+  build-release:
+    needs: prepare-release
+    if: needs.prepare-release.outputs.should-release == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            profile: linux-gcc11
+          - os: ubuntu-22.04
+            profile: linux-clang15
+          - os: windows-2022
+            profile: windows-msvc2022
+          - os: macos-12
+            profile: macos-clang14
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Set up Conan Python Environment
+        run: |
+          python scripts/setup-conan-python-env.py
+          python scripts/conan/conan_cli.py setup
+      
+      - name: Build release package
+        run: |
+          python scripts/conan/conan_cli.py install --profile=${{ matrix.profile }}
+          python scripts/conan/conan_cli.py build --profile=${{ matrix.profile }}
+      
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.profile }}
+          path: |
+            ~/.conan2/p/*/p/
+
+  deploy-release:
+    needs: [prepare-release, build-release]
+    if: needs.prepare-release.outputs.should-release == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install Conan
+        run: |
+          pip install conan
+          conan profile detect --force
+      
+      - name: Configure remote
+        run: |
+          conan remote add production ${{ secrets.CONAN_REMOTE_URL }}
+          conan user -p ${{ secrets.CONAN_REMOTE_PASSWORD }} -r production ${{ secrets.CONAN_REMOTE_USERNAME }}
+      
+      - name: Upload to production
+        run: |
+          conan upload "openssl/${{ needs.prepare-release.outputs.version }}@user/channel" -r=production --all --confirm
+      
+      - name: Create GitHub release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ needs.prepare-release.outputs.version }}
+          release_name: OpenSSL ${{ needs.prepare-release.outputs.version }}
+          body: |
+            OpenSSL ${{ needs.prepare-release.outputs.version }} Conan Package
+            
+            ## Platforms Supported
+            - Linux (GCC 11, Clang 15)
+            - Windows (MSVC 2022)
+            - macOS (Clang 14)
+            
+            ## Installation
+            ```bash
+            conan install openssl/${{ needs.prepare-release.outputs.version }}@user/channel
+            ```
+          draft: false
+          prerelease: false
