@@ -1,0 +1,111 @@
+name: Conan PR Integration Tests
+
+on:
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'conanfile.py'
+      - 'conanfile.txt'
+      - 'conan-recipes/**'
+      - 'src/**'
+      - 'include/**'
+      - 'test/**'
+  workflow_dispatch:
+
+jobs:
+  integration-tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            profile: linux-gcc11
+            compiler: gcc
+          - os: ubuntu-22.04
+            profile: linux-clang15
+            compiler: clang
+          - os: windows-2022
+            profile: windows-msvc2022
+            compiler: msvc
+          - os: macos-12
+            profile: macos-clang14
+            compiler: apple-clang
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Set up Conan Python Environment
+        run: |
+          python scripts/setup-conan-python-env.py
+          python scripts/conan/conan_cli.py setup
+      
+      - name: Install dependencies
+        run: |
+          python scripts/conan/conan_cli.py install --profile=${{ matrix.profile }}
+      
+      - name: Build package
+        run: |
+          python scripts/conan/conan_cli.py build --profile=${{ matrix.profile }}
+      
+      - name: Run tests
+        run: |
+          python scripts/conan/conan_cli.py test --profile=${{ matrix.profile }}
+      
+      - name: Generate lockfile
+        run: |
+          conan lock create conanfile.py --profile=${{ matrix.profile }} --lockfile=conan-dev/locks/${{ matrix.profile }}.lock
+      
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.profile }}
+          path: |
+            test_results/
+            conan-dev/locks/${{ matrix.profile }}.lock
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run security scan
+        run: |
+          pip install safety bandit
+          safety check
+          bandit -r src/ -f json -o security-report.json
+      
+      - name: Upload security report
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: security-report.json
+
+  performance-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install Conan
+        run: |
+          pip install conan
+          conan profile detect --force
+      
+      - name: Performance benchmark
+        run: |
+          python scripts/conan/performance_benchmark.py
+      
+      - name: Upload performance results
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-results
+          path: performance_results.json
