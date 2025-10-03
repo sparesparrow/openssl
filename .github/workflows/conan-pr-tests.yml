@@ -7,6 +7,8 @@ on:
       - 'conanfile.py'
       - 'conanfile.txt'
       - 'conan-recipes/**'
+      - 'scripts/conan/**'
+      - 'conan-dev/**'
       - 'src/**'
       - 'include/**'
       - 'test/**'
