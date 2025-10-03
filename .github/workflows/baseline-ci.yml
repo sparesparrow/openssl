@@ -1,0 +1,41 @@
+# Baseline CI - Simple Safety Net
+# Always runs without change detection or caching to catch issues missed by smart workflows
+# This provides a fallback if the optimized workflows have bugs
+
+name: Baseline CI
+
+on:
+  push:
+    branches: [main, master, 'release/*']
+  pull_request:
+    branches: [main, master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  OSSL_RUN_CI_TESTS: 1
+
+jobs:
+  # Simple GCC build - always runs, no conditions, no cache
+  baseline-gcc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: checkout fuzz/corpora submodule
+        run: git submodule update --init --depth 1 fuzz/corpora
+      - name: config
+        run: CC=gcc ./config --strict-warnings --banner=Configured enable-fips && perl configdata.pm --dump
+      - name: make
+        run: make -s -j4
+      - name: make test
+        run: .github/workflows/make-test
+      - name: smoke test
+        run: |
+          ./apps/openssl version
+          ./apps/openssl speed -evp aes-128-cbc

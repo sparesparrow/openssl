@@ -4,7 +4,7 @@
 os=Macos
 arch=armv8
 compiler=apple-clang
-compiler.version=14
+compiler.version=${APPLE_CLANG_VERSION}
 compiler.libcxx=libc++
 build_type=Release
 
@@ -20,16 +20,19 @@ openssl/*:enable_unit_test=True
 
 [buildenv]
 # macOS ARM64 environment
-CC=clang
-CXX=clang++
-CFLAGS=-O2 -g
-CXXFLAGS=-O2 -g
+CC=${CC}
+CXX=${CXX}
+CFLAGS=${CFLAGS:- -O2 -g}
+CXXFLAGS=${CXXFLAGS:- -O2 -g}
 
 # OpenSSL CI specific
 OSSL_RUN_CI_TESTS=1
-HARNESS_JOBS=4
+HARNESS_JOBS=${HARNESS_JOBS:-4}
+MACOSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET:-13.0}
+SDKROOT=${SDKROOT}
+DEVELOPER_DIR=${DEVELOPER_DIR}
 
 [conf]
 tools.system.package_manager:mode=install
-tools.env:CONAN_CPU_COUNT=4
-tools.build:jobs=4
+tools.env:CONAN_CPU_COUNT=${CONAN_CPU_COUNT}
+tools.build:jobs=${CONAN_CPU_COUNT}

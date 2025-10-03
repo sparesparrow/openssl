@@ -195,6 +195,12 @@ jobs:
             profile: ci-macos-arm64
             name: "macOS ARM64"
             container: ""
+
+          # macOS universal binary build (x86_64 + arm64 via -arch flags)
+          - os: macos-14
+            profile: ci-macos-universal
+            name: "macOS Universal"
+            container: ""
             
           # Container-based builds for consistency
           - os: ubuntu-latest
@@ -276,6 +282,7 @@ jobs:
     if: needs.changes.outputs.source-changed == 'true'
     
     strategy:
+      fail-fast: false
       matrix:
         sanitizer: [asan-ubsan, msan, tsan]
         
@@ -398,11 +405,12 @@ jobs:
       - name: Configure Conan
         run: |
           conan profile detect --force
-          conan remote add conancenter https://center.conan.io
-          
+          conan remote add conancenter ${{ env.CONAN_CENTER_URL }} || true
+          conan remote login ${{ env.CONAN_USER }} -p ${{ env.CONAN_PASSWORD }} || true
       - name: Download all artifacts
         uses: actions/download-artifact@v4
-        
+        with:
+          name: build-artifacts-*
       - name: Generate final report
         run: |
           echo "# CI/CD Build Report" > build-report.md
@@ -412,10 +420,10 @@ jobs:
           echo "- Sanitizers: ${{ needs.sanitizer-builds.result }}" >> build-report.md
           
       - name: Publish to Conan repository
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && secrets.CONAN_USER != ''
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.CONAN_USER != ''
         run: |
-          # Publishing disabled - configure secrets CONAN_USER and CONAN_PASSWORD to enable
-          echo "Conan publishing not configured"
+          conan remote login ${{ env.CONAN_USER }} -p ${{ env.CONAN_PASSWORD }} || true
+          conan upload "*" -r=${{ env.CONAN_CENTER_URL }} --confirm || true
           
       - name: Create attestation
         if: github.ref == 'refs/heads/main'

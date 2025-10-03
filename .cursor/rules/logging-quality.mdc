@@ -1,0 +1,48 @@
+---
+description: Logging QA rules (whitelists, regex filters, fault categorization)
+globs: ["**/*.c", "**/*.h", "**/*.cpp", "**/*.hpp", "scripts/**/*.py", ".github/workflows/**/*.yml"]
+alwaysApply: true
+---
+
+# Logging Quality Rules
+
+Derived from oms-dev patterns (log whitelists and regex-based allowances) to standardize logging in OpenSSL-related automation and tests.
+
+## Principles
+- **Deterministic logs**: Keep CI logs stable by filtering known, benign messages.
+- **Signal real faults**: Do not suppress errors that indicate correctness or security issues.
+- **Documented filters**: Every whitelist entry requires a rationale and issue link if available.
+
+## Whitelisting Patterns
+
+### Fixed-message whitelist
+Use sparingly for noisy but benign messages.
+
+```yaml
+log_whitelist:
+  log_whitelist_faults:
+    - "SW_INTERNAL_WARNING"
+  log_whitelist_full_faults:
+    - "^2003 SW_CAS_MASTER_DATA_VALIDITY_FAULT .* Cas master is not running$"
+    - "^2003 SW_CAS_MASTER_DATA_VALIDITY_FAULT .* At least one of CAS Master signals is invalid$"
+```
+
+### Regex whitelist
+Prefer regex for structured families of messages.
+
+```yaml
+log_whitelist:
+  log_whitelist_regex_faults:
+    - "1000 SW_SLDB_LDI_RESOLUTION_FAULT \\(.+\\) Missing static equation Id [\\d]+"
+    - "^(INFO)"
+```
+
+## OpenSSL Project Application
+- **CI noise filters**: If a workflow step produces deterministic INFO-level noise, add a regex filter and link it to the step.
+- **Provider/engine tests**: When enabling verbose crypto traces, allow-list only the precise INFO/DEBUG lines required for validation.
+- **Security-first**: Never whitelist messages mentioning memory corruption, failed verification, RNG failures, or FIPS violations.
+
+## Implementation Hints
+- Store filters in `scripts/logging/filters.yaml` and reference them in CI via an environment variable (e.g., `LOG_FILTERS`).
+- Add a small Python utility to filter logs before assertion, with metrics on how many lines were suppressed.
+- Track whitelist drift by failing when new, unclassified patterns appear (opt-in mode for new suites).

@@ -14,6 +14,7 @@ import os
 import re
 import hashlib
 import json
+import uuid
 
 
 class OpenSSLConan(ConanFile):
@@ -219,16 +220,48 @@ class OpenSSLConan(ConanFile):
         
         # Sanitizers don't work well with optimization
         if any(sanitizers) and self.settings.build_type == "Release":
-            self.output.warning(
-                "Sanitizers work best with Debug builds. "
-                "Consider using build_type=Debug for sanitizer testing."
-            )
+            # Be stricter off Linux, where Release+sanitizers tends to be flaky
+            if self.settings.os != "Linux":
+                raise ConanInvalidConfiguration(
+                    "Sanitizers with Release build_type are not supported on this platform. "
+                    "Use build_type=Debug or disable sanitizers."
+                )
+            else:
+                self.output.warning(
+                    "Sanitizers work best with Debug builds. "
+                    "Consider using build_type=Debug for sanitizer testing."
+                )
         
         # Check for no_threads with QUIC (QUIC needs threading)
         if self.options.no_threads and self.options.enable_quic:
             raise ConanInvalidConfiguration(
                 "QUIC protocol requires threading support. "
                 "Cannot use no_threads=True with enable_quic=True."
+            )
+        
+        # ASAN doesn't work well with Release optimization on Windows
+        if (self.options.enable_asan and 
+            self.settings.build_type == "Release" and 
+            self.settings.os == "Windows"):
+            raise ConanInvalidConfiguration(
+                "ASAN doesn't work well with Release optimization on Windows. "
+                "Use Debug build_type or disable ASAN for Windows Release builds."
+            )
+
+        # Cross-platform option sanity
+        if getattr(self.options, "no_sse2", False) and str(self.settings.arch) not in ["x86", "x86_64"]:
+            raise ConanInvalidConfiguration(
+                "Option no_sse2 is only meaningful on x86/x86_64 architectures."
+            )
+
+        if getattr(self.options, "386", False) and str(self.settings.arch) != "x86":
+            raise ConanInvalidConfiguration(
+                "Option 386 can only be used when arch=x86."
+            )
+
+        if self.options.enable_msan and (str(self.settings.os) != "Linux" or "clang" not in str(self.settings.compiler)):
+            raise ConanInvalidConfiguration(
+                "MSAN builds are only supported with clang on Linux."
             )
             
     def export_sources(self):
@@ -327,7 +360,7 @@ class OpenSSLConan(ConanFile):
             
         except Exception as e:
             self.output.error(f"Error generating configure command: {e}")
-            raise
+            raise ConanInvalidConfiguration(f"config script validation failed: {e}")
         
     def build(self):
         # Configure OpenSSL
@@ -419,7 +452,7 @@ class OpenSSLConan(ConanFile):
         sbom_data = {
             "bomFormat": "CycloneDX",
             "specVersion": "1.5",
-            "serialNumber": f"urn:uuid:{os.urandom(16).hex()}",
+            "serialNumber": f"urn:uuid:{uuid.uuid4()}",
             "version": 1,
             "metadata": {
                 "timestamp": str(os.environ.get("SOURCE_DATE_EPOCH", "")),
@@ -476,57 +509,12 @@ class OpenSSLConan(ConanFile):
         save(self, sbom_path, json.dumps(sbom_data, indent=2))
         self.output.success(f"SBOM generated: {sbom_path}")
         
-        # Generate package signature if key is available
-        self._sign_package(sbom_path)
-        
         # Validate licenses
         self._validate_licenses()
         
-        # Generate vulnerability report placeholder
-        self._generate_vulnerability_report()
+        # Vulnerability scanning is handled in CI; no local placeholder generation
     
-    def _sign_package(self, sbom_path):
-        """Sign package for supply chain security (placeholder for actual signing)"""
-        # This would integrate with actual signing tools like cosign, gpg, etc.
-        signing_enabled = os.getenv("CONAN_SIGN_PACKAGES", "false").lower() == "true"
-        
-        if not signing_enabled:
-            self.output.info("Package signing disabled (set CONAN_SIGN_PACKAGES=true to enable)")
-            return
-        
-        self.output.info("Package signing placeholder - integrate with cosign/gpg in production")
-        # Example integration points:
-        # - cosign sign-blob --key cosign.key sbom.json
-        # - gpg --detach-sign --armor sbom.json
-        
-        signature_metadata = {
-            "signed": True,
-            "timestamp": str(os.environ.get("SOURCE_DATE_EPOCH", "")),
-            "algorithm": "placeholder",
-            "keyid": "placeholder"
-        }
-        
-        sig_path = os.path.join(self.package_folder, "package-signature.json")
-        save(self, sig_path, json.dumps(signature_metadata, indent=2))
-    
-    def _generate_vulnerability_report(self):
-        """Generate vulnerability scan report (integration point)"""
-        # This would integrate with tools like Trivy, Snyk, OWASP Dependency Check
-        vuln_report = {
-            "scanTool": "placeholder",
-            "scanDate": str(os.environ.get("SOURCE_DATE_EPOCH", "")),
-            "component": f"{self.name}@{self.version}",
-            "vulnerabilities": [],
-            "note": "Integrate with Trivy/Snyk for actual vulnerability scanning"
-        }
-        
-        # Example integration commands (to be run in CI):
-        # trivy fs --format json --output trivy-report.json .
-        # snyk test --json > snyk-report.json
-        
-        vuln_path = os.path.join(self.package_folder, "vulnerability-report.json")
-        save(self, vuln_path, json.dumps(vuln_report, indent=2))
-        self.output.info(f"Vulnerability report placeholder generated: {vuln_path}")
+    # Removed local signing and vulnerability placeholder generation.
         
     def package_info(self):
         # Set package information
