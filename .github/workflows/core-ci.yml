@@ -109,31 +109,36 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-        
-      # CRITICAL: Build cache to avoid rebuilding from scratch
-      - name: Cache build
-        uses: actions/cache@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v6
         with:
-          path: |
-            .
-            !.git
-          key: build-${{ matrix.cc }}-${{ matrix.name }}-${{ hashFiles('**/*.c', '**/*.h', 'Configure', 'VERSION.dat') }}-${{ github.sha }}
-          restore-keys: |
-            build-${{ matrix.cc }}-${{ matrix.name }}-${{ hashFiles('**/*.c', '**/*.h', 'Configure', 'VERSION.dat') }}-
-            build-${{ matrix.cc }}-${{ matrix.name }}-
-            
+          python-version: '3.12'
+          cache: 'pip'
+      
+      - name: Set up Conan Python Environment
+        run: |
+          python scripts/setup-ci-environment.py
+      
+      - name: Create Conan build profile
+        run: |
+          conan profile detect --force
+      
       - name: Setup
         if: matrix.setup
         run: ${{ matrix.setup }}
-        
-      - name: config
-        run: CC=${{ matrix.cc }} ./config ${{ matrix.config }} && perl configdata.pm --dump
-        
-      - name: make
-        run: make -s -j4
-        
-      - name: make test
-        run: .github/workflows/make-test
+      
+      - name: Conan install
+        run: |
+          conan install . --profile=conan-dev/profiles/linux-gcc11.profile
+      
+      - name: Conan build
+        run: |
+          conan build . --profile=conan-dev/profiles/linux-gcc11.profile
+      
+      - name: Conan test
+        run: |
+          conan test . --profile=conan-dev/profiles/linux-gcc11.profile
 
   # ESSENTIAL CROSS-PLATFORM - Only 5 platforms instead of 20+
   cross-platform:
@@ -162,12 +167,32 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - name: config
-        run: ./config ${{ matrix.config }} && perl configdata.pm --dump
-      - name: make
-        run: make -j4
-      - name: make test
-        run: .github/workflows/make-test || true
+      
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      
+      - name: Set up Conan Python Environment
+        run: |
+          python scripts/setup-ci-environment.py
+      
+      - name: Create Conan build profile
+        run: |
+          conan profile detect --force
+      
+      - name: Conan install
+        run: |
+          conan install . --profile=conan-dev/profiles/linux-gcc11.profile
+      
+      - name: Conan build
+        run: |
+          conan build . --profile=conan-dev/profiles/linux-gcc11.profile
+      
+      - name: Conan test
+        run: |
+          conan test . --profile=conan-dev/profiles/linux-gcc11.profile
 
   # Fuzzing - Only run when fuzz code changes
   fuzz:
@@ -189,16 +214,31 @@ jobs:
           pip install "conan==2.0.0"
           conan --version
           
+      - name: Set up Conan Python Environment
+        run: |
+          python scripts/setup-ci-environment.py
+      
+      - name: Create Conan build profile
+        run: |
+          conan profile detect --force
+      
       - name: setup fuzz/corpora via Conan
         run: python scripts/setup-fuzz-corpora-conan.py --profile linux-gcc11
+      
       - name: Adjust ASLR
         run: sudo sysctl -w vm.mmap_rnd_bits=28
-      - name: config
-        run: ./config --strict-warnings --debug -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION enable-asan enable-ubsan enable-fips && perl configdata.pm --dump
-      - name: make
-        run: make -s -j4
-      - name: make test
-        run: .github/workflows/make-test TESTS="test_fuzz*"
+      
+      - name: Conan install
+        run: |
+          conan install . --profile=conan-dev/profiles/linux-gcc11.profile -o enable_asan=True -o enable_ubsan=True -o fips=True
+      
+      - name: Conan build
+        run: |
+          conan build . --profile=conan-dev/profiles/linux-gcc11.profile -o enable_asan=True -o enable_ubsan=True -o fips=True
+      
+      - name: Conan test
+        run: |
+          conan test . --profile=conan-dev/profiles/linux-gcc11.profile -o enable_asan=True -o enable_ubsan=True -o fips=True
 
   # Single comprehensive check job instead of many
   special-configs:
@@ -218,12 +258,32 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - name: config
-        run: ./config --strict-warnings ${{ matrix.config.opts }} && perl configdata.pm --dump
-      - name: make
-        run: make -s -j4
-      - name: make test
-        run: .github/workflows/make-test
+      
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      
+      - name: Set up Conan Python Environment
+        run: |
+          python scripts/setup-ci-environment.py
+      
+      - name: Create Conan build profile
+        run: |
+          conan profile detect --force
+      
+      - name: Conan install
+        run: |
+          conan install . --profile=conan-dev/profiles/linux-gcc11.profile
+      
+      - name: Conan build
+        run: |
+          conan build . --profile=conan-dev/profiles/linux-gcc11.profile
+      
+      - name: Conan test
+        run: |
+          conan test . --profile=conan-dev/profiles/linux-gcc11.profile
 
   # Final status check
   ci-status:

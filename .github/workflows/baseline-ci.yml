@@ -27,13 +27,29 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - name: config
-        run: CC=gcc ./config --strict-warnings --banner=Configured enable-fips && perl configdata.pm --dump
-      - name: make
-        run: make -s -j4
-      - name: make test
-        run: .github/workflows/make-test
-      - name: smoke test
+      
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      
+      - name: Set up Conan Python Environment
         run: |
-          ./apps/openssl version
-          ./apps/openssl speed -evp aes-128-cbc
+          python scripts/setup-ci-environment.py
+      
+      - name: Create Conan build profile
+        run: |
+          conan profile detect --force
+      
+      - name: Conan install
+        run: |
+          conan install . --profile=conan-dev/profiles/linux-gcc11.profile -o fips=True
+      
+      - name: Conan build
+        run: |
+          conan build . --profile=conan-dev/profiles/linux-gcc11.profile -o fips=True
+      
+      - name: Conan test
+        run: |
+          conan test . --profile=conan-dev/profiles/linux-gcc11.profile -o fips=True
