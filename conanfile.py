@@ -216,6 +216,7 @@ class OpenSSLConan(ConanFile):
     
     # Build requirements
     def build_requirements(self):
+        self.tool_requires("openssl-tools/0.1.0-17-gaff7cf4-dirty")
         # Use system perl for now - perl packages not available in conancenter
         # self.tool_requires("perl/5.38.0")
         if self.settings.os == "Windows":
@@ -648,17 +649,17 @@ class OpenSSLConan(ConanFile):
             for dep in deps.deps:
                 try:
                     dep_version = str(deps[dep].version) if hasattr(deps[dep], 'version') else "unknown"
-                component = {
-                    "type": "library",
-                    "bom-ref": f"{dep}@{dep_version}",
-                    "name": dep,
-                    "version": dep_version,
-                    "scope": "required",
-                    "licenses": []  # Would be populated from dependency metadata
-                }
-                sbom_data["components"].append(component)
-            except Exception as e:
-                self.output.warning(f"Could not add dependency {dep} to SBOM: {e}")
+                    component = {
+                        "type": "library",
+                        "bom-ref": f"{dep}@{dep_version}",
+                        "name": dep,
+                        "version": dep_version,
+                        "scope": "required",
+                        "licenses": []  # Would be populated from dependency metadata
+                    }
+                    sbom_data["components"].append(component)
+                except Exception as e:
+                    self.output.warning(f"Could not add dependency {dep} to SBOM: {e}")
         
         # Save SBOM
         sbom_path = os.path.join(self.package_folder, "sbom.json")
