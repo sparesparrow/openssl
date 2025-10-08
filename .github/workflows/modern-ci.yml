@@ -77,9 +77,9 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
+          python-version: '3.12'
           cache: 'pip'
           
       - name: Install Conan
@@ -120,10 +120,12 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Setup Python and Conan
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
-      - run: pip install "conan==${{ env.CONAN_VERSION }}"
+          python-version: '3.12'
+          cache: 'pip'
+      - name: Install Conan
+        run: pip install "conan==${{ env.CONAN_VERSION }}"
       
       - name: Cache Conan packages
         uses: actions/cache@v4
@@ -219,18 +221,18 @@ jobs:
         run: |
           if [ "${{ matrix.container }}" != "" ]; then
             # Container setup
-            apt-get update && apt-get install -y python3 python3-pip git
+            apt-get update && apt-get install -y conan-dev/venv/bin/python python-pip git
           fi
           
       - name: Setup Python and Conan
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
-        if: matrix.container == ''
+          python-version: '3.12'
+          cache: 'pip'
         
       - name: Install Conan
         run: |
-          python3 -m pip install "conan==${{ env.CONAN_VERSION }}"
+          conan-dev/venv/bin/python -m pip install "conan==${{ env.CONAN_VERSION }}"
           conan --version
           
       - name: Cache Conan packages
@@ -290,10 +292,12 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Setup Python and Conan
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
-      - run: pip install "conan==${{ env.CONAN_VERSION }}"
+          python-version: '3.12'
+          cache: 'pip'
+      - name: Install Conan
+        run: pip install "conan==${{ env.CONAN_VERSION }}"
       
       - name: Configure system for sanitizers
         run: |
@@ -351,10 +355,12 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Setup Python and Conan
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
-      - run: pip install "conan==${{ env.CONAN_VERSION }}"
+          python-version: '3.12'
+          cache: 'pip'
+      - name: Install Conan
+        run: pip install "conan==${{ env.CONAN_VERSION }}"
       
       - name: Cache Conan packages
         uses: actions/cache@v4
@@ -397,10 +403,12 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Setup Python and Conan
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
-      - run: pip install "conan==${{ env.CONAN_VERSION }}"
+          python-version: '3.12'
+          cache: 'pip'
+      - name: Install Conan
+        run: pip install "conan==${{ env.CONAN_VERSION }}"
       
       - name: Configure Conan
         run: |

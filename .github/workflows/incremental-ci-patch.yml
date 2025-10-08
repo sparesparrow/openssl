@@ -128,10 +128,11 @@ jobs:
           
       # Smart test execution
       - name: Smart test execution
+        timeout-minutes: 60
         run: |
           if [ "${{ steps.changes.outputs.tests-changed }}" = "true" ] || [ "${{ steps.changes.outputs.source-changed }}" = "true" ]; then
             echo "🧪 Running tests..."
-            make test HARNESS_JOBS=4
+            make test HARNESS_JOBS=2
           else
             echo "⚡ No relevant changes for testing, running quick smoke test..."
             ./apps/openssl version -a
