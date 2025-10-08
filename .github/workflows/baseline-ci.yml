@@ -27,8 +27,6 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - name: setup fuzz/corpora via Conan
-        run: python scripts/setup-fuzz-corpora-conan.py --profile linux-gcc11
       - name: config
         run: CC=gcc ./config --strict-warnings --banner=Configured enable-fips && perl configdata.pm --dump
       - name: make

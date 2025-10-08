@@ -43,8 +43,6 @@ jobs:
       CLICOLOR: 1
     steps:
     - uses: actions/checkout@v4
-    - name: setup fuzz/corpora via Conan
-      run: python scripts/setup-fuzz-corpora-conan.py --profile windows-msvc2022
       
     - name: Set up Python
       uses: actions/setup-python@v6
@@ -116,8 +114,6 @@ jobs:
       CLICOLOR: 1
     steps:
     - uses: actions/checkout@v4
-    - name: setup fuzz/corpora via Conan
-      run: python scripts/setup-fuzz-corpora-conan.py --profile windows-msvc2022
       
     - name: Set up Python
       uses: actions/setup-python@v6
@@ -161,10 +157,6 @@ jobs:
       CLICOLOR: 1
     steps:
     - uses: actions/checkout@v4
-    - name: setup fuzz/corpora via Conan
-      run: python scripts/setup-fuzz-corpora-conan.py --profile windows-msvc2022
-      
-    - name: Set up Python
       uses: actions/setup-python@v6
       with:
         python-version: '3.12'

@@ -109,8 +109,6 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - name: setup fuzz/corpora via Conan
-        run: python scripts/setup-fuzz-corpora-conan.py --profile linux-gcc11
         
       # CRITICAL: Build cache to avoid rebuilding from scratch
       - name: Cache build
@@ -179,6 +177,18 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          
+      - name: Install Conan
+        run: |
+          pip install "conan==2.0.0"
+          conan --version
+          
       - name: setup fuzz/corpora via Conan
         run: python scripts/setup-fuzz-corpora-conan.py --profile linux-gcc11
       - name: Adjust ASLR
