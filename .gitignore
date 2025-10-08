@@ -1,6 +1,20 @@
 # Ignore editor artefacts
 /.dir-locals.el
 
+# Python virtual environments and Conan development
+conan-dev/venv/
+venv/
+env/
+.venv/
+.env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
 # Top level excludes
 /Makefile.in
 /Makefile
@@ -408,3 +422,4 @@ doc-nits
 # LSP (Language Server Protocol) support
 .cache/
 compile_commands.json
+

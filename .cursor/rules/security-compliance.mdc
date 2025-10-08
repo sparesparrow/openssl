@@ -1,0 +1,349 @@
+---
+description: Security and compliance rules for OpenSSL (supply chain, crypto, governance)
+globs: ["**/*.c", "**/*.h", "scripts/**/*.py", ".github/workflows/**/*.yml", "conan/**"]
+alwaysApply: true
+---
+
+# Security and Compliance Rules
+
+Based on analysis of oms-dev security practices and modern security requirements for OpenSSL.
+
+## Security-First Development
+
+### Supply Chain Security
+- **Generate Software Bill of Materials (SBOM)** for all packages
+- **Implement dependency vulnerability scanning** throughout the pipeline
+- **Use signed packages** with cryptographic verification
+- **Maintain audit trails** for all security-related changes
+
+### Cryptographic Security
+- **Validate cryptographic implementations** against known standards
+- **Implement proper key management** practices
+- **Use secure random number generation** for all cryptographic operations
+- **Follow cryptographic best practices** and avoid deprecated algorithms
+
+### Code Security
+- **Implement static code analysis** for security vulnerabilities
+- **Use dynamic analysis tools** for runtime security testing
+- **Perform regular security audits** of the codebase
+- **Implement secure coding practices** throughout development
+
+## Michal's Security Patterns
+
+### Automated Security Updates
+```python
+def automated_security_updates():
+    """Automated security updates - pattern from oms-dev"""
+    # Pattern: Regular automated package updates
+    # - Check for security updates
+    # - Validate compatibility
+    # - Test security patches
+    # - Deploy updates automatically
+    pass
+
+
+def validate_security_patches():
+    """Validate security patches before deployment"""
+    # Run security tests
+    # Validate cryptographic functions
+    # Check for regressions
+    # Verify compliance
+    pass
+```
+
+### Database Security Validation
+```python
+def validate_database_security():
+    """Validate database security - pattern from oms-dev"""
+    # Pattern from oms-dev: Database schema validation
+    # - Check schema integrity
+    # - Validate security constraints
+    # - Verify data encryption
+    # - Test access controls
+    pass
+
+
+def check_database_vulnerabilities():
+    """Check for database vulnerabilities"""
+    # Scan for SQL injection vulnerabilities
+    # Check for privilege escalation
+    # Validate encryption settings
+    # Test backup security
+    pass
+```
+
+### Build Security
+```python
+def secure_build_process():
+    """Implement secure build process"""
+    # Use hermetic build environments
+    # Validate build artifacts
+    # Sign build outputs
+    # Verify build integrity
+    pass
+```
+
+## OpenSSL-Specific Security
+
+### FIPS Compliance
+```python
+def implement_fips_compliance():
+    """Implement FIPS 140-2 compliance"""
+    # Enable FIPS mode
+    # Validate FIPS algorithms
+    # Test FIPS compliance
+    # Generate compliance reports
+    pass
+
+
+def validate_fips_algorithms():
+    """Validate FIPS-approved algorithms"""
+    # Check algorithm implementations
+    # Verify FIPS certification
+    # Test algorithm performance
+    # Validate security properties
+    pass
+```
+
+### Cryptographic Validation
+```python
+def validate_cryptographic_implementations():
+    """Validate cryptographic implementations"""
+    # Test algorithm correctness
+    # Validate key generation
+    # Check random number generation
+    # Verify cryptographic protocols
+    pass
+
+
+def security_testing_suite():
+    """Comprehensive security testing suite"""
+    # Unit tests for crypto functions
+    # Integration tests for protocols
+    # Performance tests for algorithms
+    # Security regression tests
+    pass
+```
+
+### Vulnerability Management
+```python
+def vulnerability_scanning():
+    """Comprehensive vulnerability scanning"""
+    # Scan for known vulnerabilities
+    # Check for CVE entries
+    # Validate security patches
+    # Test for new vulnerabilities
+    pass
+
+
+def security_monitoring():
+    """Continuous security monitoring"""
+    # Monitor security advisories
+    # Track vulnerability databases
+    # Alert on security issues
+    # Generate security reports
+    pass
+```
+
+## Compliance and Governance
+
+### Regulatory Compliance
+```python
+def ensure_regulatory_compliance():
+    """Ensure regulatory compliance"""
+    # GDPR compliance
+    # SOX compliance
+    # HIPAA compliance
+    # Industry-specific regulations
+    pass
+
+
+def generate_compliance_reports():
+    """Generate compliance reports"""
+    # Security compliance
+    # License compliance
+    # Export compliance
+    # Audit reports
+    pass
+```
+
+### License Management
+```python
+def manage_licenses():
+    """Comprehensive license management"""
+    # Track all licenses
+    # Validate license compatibility
+    # Generate license reports
+    # Handle license conflicts
+    pass
+
+
+def license_compliance_check():
+    """Check license compliance"""
+    # Verify license requirements
+    # Check for license violations
+    # Generate compliance reports
+    # Handle license issues
+    pass
+```
+
+### Audit Trail Management
+```python
+def maintain_audit_trails():
+    """Maintain comprehensive audit trails"""
+    # Track all changes
+    # Log security events
+    # Maintain access logs
+    # Generate audit reports
+    pass
+
+
+def security_logging():
+    """Comprehensive security logging"""
+    # Log security events
+    # Track access attempts
+    # Monitor system changes
+    # Alert on security issues
+    pass
+```
+
+## Security Testing and Validation
+
+### Automated Security Testing
+```python
+def automated_security_tests():
+    """Automated security testing suite"""
+    # Static analysis
+    # Dynamic analysis
+    # Penetration testing
+    # Vulnerability scanning
+    pass
+
+
+def security_test_automation():
+    """Automate security testing processes"""
+    # Run security tests
+    # Generate test reports
+    # Validate security requirements
+    # Track security metrics
+    pass
+```
+
+### Penetration Testing
+```python
+def penetration_testing():
+    """Comprehensive penetration testing"""
+    # Network penetration testing
+    # Application penetration testing
+    # Cryptographic testing
+    # Social engineering testing
+    pass
+
+
+def security_assessment():
+    """Regular security assessments"""
+    # Risk assessment
+    # Vulnerability assessment
+    # Compliance assessment
+    # Security audit
+    pass
+```
+
+## Incident Response
+
+### Security Incident Response
+```python
+def security_incident_response():
+    """Security incident response procedures"""
+    # Incident detection
+    # Incident response
+    # Incident recovery
+    # Post-incident analysis
+    pass
+
+
+def security_monitoring():
+    """Continuous security monitoring"""
+    # Monitor security events
+    # Detect security threats
+    # Alert on security issues
+    # Track security metrics
+    pass
+```
+
+### Threat Intelligence
+```python
+def threat_intelligence():
+    """Threat intelligence integration"""
+    # Monitor threat feeds
+    # Analyze threat indicators
+    # Update security measures
+    # Share threat information
+    pass
+
+
+def security_awareness():
+    """Security awareness and training"""
+    # Security training
+    # Awareness programs
+    # Security policies
+    # Best practices
+    pass
+```
+
+## Security Tools and Integration
+
+### Security Tool Integration
+```python
+def integrate_security_tools():
+    """Integrate security tools into CI/CD"""
+    # Static analysis tools
+    # Dynamic analysis tools
+    # Vulnerability scanners
+    # Security monitoring tools
+    pass
+
+
+def security_toolchain():
+    """Comprehensive security toolchain"""
+    # SAST tools
+    # DAST tools
+    # IAST tools
+    # Security testing tools
+    pass
+```
+
+### Security Metrics and Reporting
+```python
+def security_metrics():
+    """Comprehensive security metrics"""
+    # Security test coverage
+    # Vulnerability metrics
+    # Compliance metrics
+    # Risk metrics
+    pass
+
+
+def security_reporting():
+    """Automated security reporting"""
+    # Security dashboards
+    # Compliance reports
+    # Risk reports
+    # Audit reports
+    pass
+```
+
+## Best Practices Summary
+
+1. **Security by Design**: Integrate security throughout the development lifecycle
+2. **Automated Security**: Automate security testing and validation
+3. **Continuous Monitoring**: Implement continuous security monitoring
+4. **Compliance Management**: Ensure regulatory and license compliance
+5. **Incident Response**: Prepare for and respond to security incidents
+6. **Threat Intelligence**: Integrate threat intelligence into security practices
+7. **Security Training**: Provide security awareness and training
+8. **Audit Trails**: Maintain comprehensive audit trails
+9. **Vulnerability Management**: Implement comprehensive vulnerability management
+10. **Security Metrics**: Track and report security metrics
+
+These rules ensure comprehensive security and compliance for OpenSSL development while maintaining high security standards.

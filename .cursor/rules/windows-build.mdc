@@ -1,0 +1,29 @@
+---
+description: Windows/MSVC build guidance (flags, warnings, deps, platform shims)
+globs: ["**/*.vcxproj", "**/*.props", "**/*.sln", "**/*.c", "**/*.h", "**/*.cpp", "**/*.hpp"]
+alwaysApply: true
+---
+
+# Windows/MSVC Build Rules
+
+Derived from oms-dev desktop configs to harmonize Windows builds in CI and local dev.
+
+## Compiler Settings
+- Language standard: C11 for C, C++17 for C++ where needed by tools/tests.
+- Enable multi-processor compilation.
+- Prefer `/Zc:sizedDealloc-` when interop with non-conforming allocators is required.
+- Disable warnings that conflict with platform shims: `5043;4291;4100` (example set).
+
+## Defines
+- Add platform guard defines only where necessary (e.g., `_CRT_SECURE_NO_WARNINGS`, `_WINSOCK_DEPRECATED_NO_WARNINGS`).
+- Keep security defines minimal; prefer fixing code over suppressing.
+
+## Linking
+- Generate PDBs and map files in debug.
+- Centralize import library output path under `Libraries/`.
+
+## Includes
+- Consolidate external include directories via `.props` and reuse across projects.
+
+## CI
+- Provide a job on `windows-2022` runners building key targets to catch MSVC-specific regressions.
