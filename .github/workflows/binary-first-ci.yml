@@ -100,7 +100,6 @@ env:
         with:
           python-version: '3.12'
           cache: 'pip'
-if: matrix.config.container == ''
         
       - name: Install Conan
         run: |

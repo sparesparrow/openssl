@@ -81,7 +81,8 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
-- name: Install Conan
+          
+      - name: Install Conan
         run: |
           pip install "conan==${{ env.CONAN_VERSION }}"
           conan --version
@@ -228,7 +229,6 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
-if: matrix.container == ''
         
       - name: Install Conan
         run: |
