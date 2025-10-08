@@ -116,8 +116,8 @@ jobs:
       
       - name: Configure GitHub Packages remote
         run: |
-          conan remote add github-packages https://nuget.pkg.github.com/sparesparrow/index.json || true
-          conan remote login github-packages ${{ secrets.GITHUB_TOKEN }}
+          conan remote add github-packages https://maven.pkg.github.com/sparesparrow/openssl || true
+          conan remote login github-packages ${{ secrets.CONAN_GITHUB_TOKEN }}
       
       - name: Generate cache key
         id: cache-key
@@ -176,16 +176,28 @@ jobs:
       
       - name: Configure GitHub Packages remote
         run: |
-          conan remote add github-packages https://nuget.pkg.github.com/sparesparrow/index.json || true
-          conan remote login github-packages ${{ secrets.GITHUB_TOKEN }}
+          conan remote add github-packages https://maven.pkg.github.com/sparesparrow/openssl || true
+          conan remote login github-packages ${{ secrets.CONAN_GITHUB_TOKEN }}
       
       - name: Cache Conan packages
         uses: actions/cache@v4
         with:
           path: ~/.conan2
-          key: ${{ needs.setup-conan.outputs.cache-key }}
+          key: conan-${{ runner.os }}-${{ hashFiles('conanfile.py', 'conan-dev/**', 'requirements.txt') }}-${{ matrix.profile }}
           restore-keys: |
+            conan-${{ runner.os }}-${{ hashFiles('conanfile.py', 'conan-dev/**') }}-
             conan-${{ runner.os }}-
+      
+      - name: Validate build environment
+        run: |
+          conan --version
+          python --version
+          gcc --version || clang --version
+      
+      - name: Validate conanfile.py
+        run: |
+          python -m py_compile conanfile.py
+          conan inspect .
       
       - name: Setup environment
         if: matrix.setup
@@ -234,17 +246,19 @@ jobs:
           # ARM64 - Single representative
           - name: "linux-arm64"
             os: linux-arm64
-            profile: "linux-arm64"
+            profile: "linux-arm64-gcc"
             options: "fips=True"
+            timeout: 45
             
           # macOS - Only latest version  
           - name: "macos-arm64"
             os: macos-14
             profile: "macos-arm64"
             options: "fips=True"
+            timeout: 60
             
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: ${{ matrix.timeout || 30 }}
     steps:
       - uses: actions/checkout@v4
       
@@ -266,15 +280,16 @@ jobs:
       
       - name: Configure GitHub Packages remote
         run: |
-          conan remote add github-packages https://nuget.pkg.github.com/sparesparrow/index.json || true
-          conan remote login github-packages ${{ secrets.GITHUB_TOKEN }}
+          conan remote add github-packages https://maven.pkg.github.com/sparesparrow/openssl || true
+          conan remote login github-packages ${{ secrets.CONAN_GITHUB_TOKEN }}
       
       - name: Cache Conan packages
         uses: actions/cache@v4
         with:
           path: ~/.conan2
-          key: conan-${{ runner.os }}-${{ hashFiles('conanfile.py') }}
+          key: conan-${{ runner.os }}-${{ hashFiles('conanfile.py', 'conan-dev/**', 'requirements.txt') }}-${{ matrix.profile }}
           restore-keys: |
+            conan-${{ runner.os }}-${{ hashFiles('conanfile.py', 'conan-dev/**') }}-
             conan-${{ runner.os }}-
       
       - name: Build with Conan
@@ -315,12 +330,13 @@ jobs:
       
       - name: Configure GitHub Packages remote
         run: |
-          conan remote add github-packages https://nuget.pkg.github.com/sparesparrow/index.json || true
-          conan remote login github-packages ${{ secrets.GITHUB_TOKEN }}
+          conan remote add github-packages https://maven.pkg.github.com/sparesparrow/openssl || true
+          conan remote login github-packages ${{ secrets.CONAN_GITHUB_TOKEN }}
       
-      - name: Setup fuzz corpora
+      - name: Setup fuzz corpora dependency
         run: |
-          git submodule update --init --depth 1 fuzz/corpora
+          conan install fuzz-corpora/1.0@ --profile=default || echo "Fuzz corpora package not available, using git submodule"
+          git submodule update --init --depth 1 fuzz/corpora || git clone https://github.com/sparesparrow/fuzz-corpora.git fuzz/corpora
       
       - name: Adjust ASLR
         run: sudo sysctl -w vm.mmap_rnd_bits=28

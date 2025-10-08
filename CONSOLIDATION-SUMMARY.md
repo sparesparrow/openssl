@@ -101,8 +101,10 @@ gh workflow disable "windows_comp.yml"
 
 ### 3. Configure GitHub Secrets
 Ensure these secrets are configured in your repository:
-- `GITHUB_TOKEN` (automatically provided)
+- `CONAN_GITHUB_TOKEN` (dedicated PAT with packages:write permission)
 - `CONAN_SIGN_PACKAGES` (optional, for package signing)
+
+**IMPORTANT**: Create a dedicated Personal Access Token (PAT) with `packages:write` permission for Conan package uploads. The default `GITHUB_TOKEN` may not have sufficient permissions.
 
 ### 4. Test the New Workflow
 1. Create a test PR with source code changes
@@ -120,9 +122,10 @@ Ensure these secrets are configured in your repository:
 
 ### Conan 2 Integration
 - **Version**: Conan 2.0.17
-- **Caching**: Multi-level caching strategy
-- **Profiles**: Platform-specific build profiles
-- **Packages**: Automated upload to GitHub Packages
+- **Caching**: Multi-level caching strategy with intelligent cache invalidation
+- **Profiles**: Platform-specific build profiles (verified and corrected)
+- **Packages**: Automated upload to GitHub Packages via Maven registry
+- **Security**: Dedicated PAT for package uploads
 
 ### Security Features
 - **SBOM**: CycloneDX format with comprehensive metadata
