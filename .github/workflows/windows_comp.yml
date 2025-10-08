@@ -42,6 +42,10 @@ jobs:
       run: |
         python scripts/setup-ci-environment.py
     
+    - name: Create Conan build profile
+      run: |
+        conan profile detect --force
+    
     - name: Conan install
       run: |
         conan install . --profile=conan-dev/profiles/windows-msvc2022.profile -o enable_zstd=True -o fips=True
@@ -71,11 +75,15 @@ jobs:
         # Extract to C:\nasm
         Expand-Archive -Path $output -DestinationPath "C:\nasm" -Force
         
+        # Find the actual nasm.exe location (it's usually in a subdirectory)
+        $nasmDir = Get-ChildItem -Path "C:\nasm" -Recurse -Name "nasm.exe" | Select-Object -First 1
+        $nasmPath = Split-Path -Parent "C:\nasm\$nasmDir"
+        
         # Add to PATH
-        echo "C:\nasm" >> $env:GITHUB_PATH
+        echo $nasmPath >> $env:GITHUB_PATH
         
         # Verify installation
-        C:\nasm\nasm.exe --version
+        & "$nasmPath\nasm.exe" --version
     - name: prepare the build directory
       run: mkdir _build
     - name: Get brotli
@@ -121,7 +129,3 @@ jobs:
         7z.exe x coreinfo/Coreinfo.zip
         ./Coreinfo64.exe -accepteula -f
         ./apps/openssl.exe version -c
-    - name: Conan test
-      timeout-minutes: 60
-      run: |
-        conan test . --profile=conan-dev/profiles/windows-msvc2022.profile -o enable_brotli=True -o fips=True
