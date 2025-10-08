@@ -57,15 +57,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-          cache: 'pip'
-      - name: Install openssl-tools (automation)
-        run: |
-          pip install --upgrade pip
-          pip install "git+https://github.com/sparesparrow/openssl-tools.git#egg=openssl-tools"
       - name: config
         run: ./config --strict-warnings --banner=Configured enable-fips && perl configdata.pm --dump
       - name: make build_generated
@@ -84,15 +75,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-          cache: 'pip'
-      - name: Install openssl-tools (automation)
-        run: |
-          pip install --upgrade pip
-          pip install "git+https://github.com/sparesparrow/openssl-tools.git#egg=openssl-tools"
       - name: checkout fuzz/corpora submodule
         run: git submodule update --init --depth 1 fuzz/corpora
         
@@ -139,15 +121,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-          cache: 'pip'
-      - name: Install openssl-tools (automation)
-        run: |
-          pip install --upgrade pip
-          pip install "git+https://github.com/sparesparrow/openssl-tools.git#egg=openssl-tools"
       - name: checkout fuzz/corpora submodule
         run: git submodule update --init --depth 1 fuzz/corpora
         
@@ -187,15 +160,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-          cache: 'pip'
-      - name: Install openssl-tools (automation)
-        run: |
-          pip install --upgrade pip
-          pip install "git+https://github.com/sparesparrow/openssl-tools.git#egg=openssl-tools"
       - name: checkout fuzz/corpora submodule
         run: git submodule update --init --depth 1 fuzz/corpora
       - name: Adjust ASLR for sanitizer

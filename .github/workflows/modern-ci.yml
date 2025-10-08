@@ -86,10 +86,6 @@ jobs:
         run: |
           pip install "conan==${{ env.CONAN_VERSION }}"
           conan --version
-      - name: Install openssl-tools (automation)
-        run: |
-          pip install --upgrade pip
-          pip install "git+https://github.com/sparesparrow/openssl-tools.git#egg=openssl-tools"
           
       - name: Generate cache key
         id: cache-key
@@ -130,10 +126,6 @@ jobs:
           cache: 'pip'
       - name: Install Conan
         run: pip install "conan==${{ env.CONAN_VERSION }}"
-      - name: Install openssl-tools (automation)
-        run: |
-          pip install --upgrade pip
-          pip install "git+https://github.com/sparesparrow/openssl-tools.git#egg=openssl-tools"
       
       - name: Cache Conan packages
         uses: actions/cache@v4
@@ -242,10 +234,6 @@ jobs:
         run: |
           conan-dev/venv/bin/python -m pip install "conan==${{ env.CONAN_VERSION }}"
           conan --version
-      - name: Install openssl-tools (automation)
-        run: |
-          pip install --upgrade pip
-          pip install "git+https://github.com/sparesparrow/openssl-tools.git#egg=openssl-tools"
           
       - name: Cache Conan packages
         uses: actions/cache@v4
@@ -310,10 +298,6 @@ jobs:
           cache: 'pip'
       - name: Install Conan
         run: pip install "conan==${{ env.CONAN_VERSION }}"
-      - name: Install openssl-tools (automation)
-        run: |
-          pip install --upgrade pip
-          pip install "git+https://github.com/sparesparrow/openssl-tools.git#egg=openssl-tools"
       
       - name: Configure system for sanitizers
         run: |
@@ -377,10 +361,6 @@ jobs:
           cache: 'pip'
       - name: Install Conan
         run: pip install "conan==${{ env.CONAN_VERSION }}"
-      - name: Install openssl-tools (automation)
-        run: |
-          pip install --upgrade pip
-          pip install "git+https://github.com/sparesparrow/openssl-tools.git#egg=openssl-tools"
       
       - name: Cache Conan packages
         uses: actions/cache@v4

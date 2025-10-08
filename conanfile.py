@@ -648,18 +648,18 @@ class OpenSSLConan(ConanFile):
             for dep in deps.deps:
                 try:
                     dep_version = str(deps[dep].version) if hasattr(deps[dep], 'version') else "unknown"
-                    component = {
-                        "type": "library",
-                        "bom-ref": f"{dep}@{dep_version}",
-                        "name": dep,
-                        "version": dep_version,
-                        "scope": "required",
-                        "licenses": []  # Would be populated from dependency metadata
-                    }
-                    sbom_data["components"].append(component)
-                except Exception as e:
-                    self.output.warning(f"Could not add dependency {dep} to SBOM: {e}")
-            
+                component = {
+                    "type": "library",
+                    "bom-ref": f"{dep}@{dep_version}",
+                    "name": dep,
+                    "version": dep_version,
+                    "scope": "required",
+                    "licenses": []  # Would be populated from dependency metadata
+                }
+                sbom_data["components"].append(component)
+            except Exception as e:
+                self.output.warning(f"Could not add dependency {dep} to SBOM: {e}")
+        
         # Save SBOM
         sbom_path = os.path.join(self.package_folder, "sbom.json")
         save(self, sbom_path, json.dumps(sbom_data, indent=2))
