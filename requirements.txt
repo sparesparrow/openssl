@@ -31,6 +31,11 @@ GitPython>=3.1.0
 python-dotenv>=1.0.0
 jinja2>=3.1.0
 
+# OpenSSL CI/CD Requirements
+# Used for caching optimization in GitHub Actions
+conan==2.0.17
+trivy>=0.50.0
+
 # Optional advanced features (uncomment as needed)
 # pytest-xdist>=3.0.0  # Parallel testing
 # pytest-html>=3.0.0   # HTML test reports
