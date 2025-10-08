@@ -84,6 +84,7 @@ class OpenSSLConan(ConanFile):
         "enable_zlib": [True, False],
         "enable_zlib_dynamic": [True, False],
         "enable_zstd": [True, False],
+        "enable_brotli": [True, False],
         
         # Legacy & Compatibility
         "no_legacy": [True, False],
@@ -175,6 +176,7 @@ class OpenSSLConan(ConanFile):
         "enable_zlib": False,
         "enable_zlib_dynamic": False,
         "enable_zstd": False,
+        "enable_brotli": False,
         
         # Legacy & Compatibility
         "no_legacy": False,
@@ -224,6 +226,12 @@ class OpenSSLConan(ConanFile):
     def requirements(self):
         if not self.options.no_zlib:
             self.requires("zlib/1.3.1")
+        
+        if self.options.enable_zstd:
+            self.requires("zstd/1.5.5")
+            
+        if self.options.enable_brotli:
+            self.requires("brotli/1.1.0")
         
         # Add fuzz corpora if fuzzing is enabled
         if (self.options.enable_fuzzer_afl or self.options.enable_fuzzer_libfuzzer or 
@@ -426,7 +434,7 @@ class OpenSSLConan(ConanFile):
                 "external_tests", "buildtest_c++", "crypto_mdebug", 
                 "crypto_mdebug_backtrace", "lms", "quic", "h3demo", "demos",
                 "sslkeylog", "md2", "md4", "ec_nistp_64_gcc_128",
-                "ktls", "sctp", "zlib", "zlib_dynamic", "zstd", "egd"
+                "ktls", "sctp", "zlib", "zlib_dynamic", "zstd", "brotli", "egd"
             ]
             
             # No- options
