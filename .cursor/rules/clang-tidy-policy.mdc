@@ -1,0 +1,34 @@
+---
+description: Clang-Tidy policy and suppressions for mixed modern/legacy codebases
+globs: ["**/*.c", "**/*.h", "**/*.cpp", "**/*.hpp", ".clang-tidy"]
+alwaysApply: true
+---
+
+# Clang-Tidy Policy
+
+Inspired by oms-dev `.clang-tidy` to balance modernization with legacy/platform constraints.
+
+## Baseline
+- Use project `.clang-tidy` at repo root.
+- Prefer enabling broad checks, then disable noisy/irrelevant ones.
+
+## Recommended Config Snippet
+```yaml
+Checks: '*,-modernize-use-trailing-return-type,-readability-convert-member-functions-to-static,-misc-unused-parameters,-google-readability-todo,-cppcoreguidelines-pro-type-static-cast-downcast,-a*,-modernize-return-braced-init-list,-llvm-qualified-auto,-readability-qualified-auto,-fuchsia-default-arguments-declarations,-llvm-header-guard,-llvmlibc-restrict-system-libc-headers,-llvm-namespace-comment,-google-readability-namespace-comments'
+HeaderFilterRegex: '.*'
+FormatStyle: 'file'
+CheckOptions:
+  - key: misc-const-correctness.TransformValues
+    value: 'False'
+  - key: cppcoreguidelines-pro-type-member-init.UseAssignment
+    value: '1'
+```
+
+## OpenSSL Considerations
+- Do not force trailing return types or qualified auto changes globally; follow upstream style.
+- Explicitly suppress checks that conflict with public headers or platform shims.
+- Keep warnings-as-errors off in tidy; enforce in CI compile step instead.
+
+## CI Integration
+- Run clang-tidy on touched files in PRs for speed.
+- Provide an allowlist/denylist to focus on code you own (e.g., `scripts/`, providers, or adapters).

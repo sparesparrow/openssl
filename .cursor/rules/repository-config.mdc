@@ -1,0 +1,37 @@
+---
+description: Repository configuration and path indirection rules (env-driven layouts)
+globs: ["scripts/**/*.py", "**/*.yml", "**/*.yaml", "**/*.cfg", "**/*.conf"]
+alwaysApply: true
+---
+
+# Repository Configuration Rules
+
+Based on oms-dev `Conf/*` patterns to keep paths relocatable and environment-driven.
+
+## Principles
+- **Indirection**: Compute paths from a small set of environment variables.
+- **Portability**: Avoid hard-coded absolute paths; prefer variables like `ENV_REPOSITORY_ROOT`.
+- **Single source of truth**: Centralize repository layout in one config file consumed by tools.
+
+## Standard Variables
+- `ENV_REPOSITORY_ROOT`: Repository root; set by CI and local scripts.
+- `BUILD_ROOT`: Derived build directory root.
+- `TOOLS_ROOT`, `PRODUCT_ROOT`, `SOURCE_ROOT`: Computed sub-roots.
+
+## Example Layout (YAML)
+```yaml
+repo_layout:
+  repository_root: ${ENV_REPOSITORY_ROOT}
+  build_root: ${repo_layout.repository_root}/_Build
+  source_root: ${repo_layout.build_root}/SOURCE
+  product_root: ${repo_layout.source_root}/Product
+  tools_root: ${repo_layout.build_root}/TOOLS
+```
+
+## Guidance for OpenSSL
+- Keep all CI artifact/output paths under a single `build/` or `_Build/` root.
+- For integration tests referencing fixtures, compute absolute paths at runtime from `ENV_REPOSITORY_ROOT`.
+- Provide `scripts/env.sh` to export variables and be sourced by CI.
+
+## Validation
+- Add a sanity-check script that resolves the config and asserts directories exist before running builds.

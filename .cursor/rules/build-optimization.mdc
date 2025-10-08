@@ -1,0 +1,297 @@
+---
+description: Build optimization guidance for OpenSSL (compiler, caching, parallelism)
+globs: ["**/*.c", "**/*.h", "Configurations/**/*.conf", "conanfile.py", "conan/**", "scripts/**/*.py", ".github/workflows/**/*.yml", "**/build.info", "Makefile", "*/Makefile"]
+alwaysApply: true
+---
+
+# Build Optimization Rules
+
+Based on analysis of oms-dev build practices and modern C/C++ build optimization techniques.
+
+## Build Performance Optimization
+
+### Compiler Optimization
+- **Use appropriate optimization levels** (-O2 for release, -O1 for debug)
+- **Enable Link Time Optimization (LTO)** for release builds
+- **Use profile-guided optimization (PGO)** where applicable
+- **Implement compiler-specific optimizations** (GCC, Clang, MSVC)
+
+### Parallel Build Strategies
+- **Use make -j$(nproc)** for optimal parallelization
+- **Implement Ninja build system** for faster incremental builds
+- **Set up proper dependency management** to avoid unnecessary rebuilds
+- **Use build graph analysis** to optimize build order
+
+### Caching Strategies
+- **Implement compiler caching** (ccache, sccache)
+- **Use Conan binary caching** for dependency reuse
+- **Set up distributed caching** for CI/CD environments
+- **Implement intelligent cache invalidation**
+
+## Michal's Build Patterns
+
+### Hermetic Build Environment
+```python
+def setup_hermetic_build():
+    """Set up hermetic build environment from oms-dev patterns"""
+    # Pin exact toolchain versions
+    os.environ['CC'] = '/usr/bin/gcc-11'
+    os.environ['CXX'] = '/usr/bin/g++-11'
+    
+    # Set reproducible build flags
+    os.environ['CFLAGS'] = '-ffile-prefix-map=$PWD=. -fdebug-prefix-map=$PWD=.'
+    os.environ['CXXFLAGS'] = '-ffile-prefix-map=$PWD=. -fdebug-prefix-map=$PWD=.'
+    
+    # Configure caching
+    os.environ['CCACHE_DIR'] = '/cache/ccache'
+    os.environ['CCACHE_MAXSIZE'] = '5G'
+```
+
+### Build Configuration Management
+```python
+def configure_build_options():
+    """Configure build options based on environment"""
+    # Pattern from oms-dev conanfile.py
+    if self.settings.build_type == "Debug":
+        self.options.enable_crypto_mdebug = True
+        
+    if self.options.fips:
+        self.options.enable_unit_test = True
+        
+    # Performance builds
+    if self.settings.build_type == "Release":
+        self.options.no_asm = False
+```
+
+### Database Schema Validation
+```python
+def check_database_schemas(base_database, match_databases):
+    """Validate database schemas - pattern from oms-dev"""
+    tools = SQLiteTools(self.deps_env_info['sqlite-tools'].package_dir)
+    sqlite_diff_tool = Path(tools.sqlite_tools_diff_exe())
+    
+    for db in match_databases:
+        final_diff = self.compare_database_schema(base_database, db, sqlite_diff_tool)
+        if final_diff:
+            # Handle schema mismatches
+            self.output.warning(f'Schema mismatch: {base_database} vs {db}')
+```
+
+## OpenSSL-Specific Optimizations
+
+### Cryptographic Algorithm Selection
+```python
+def optimize_crypto_algorithms():
+    """Optimize cryptographic algorithm selection"""
+    # Enable hardware acceleration where available
+    if self.settings.arch == "x86_64":
+        self.options.no_asm = False  # Enable assembly optimizations
+        
+    # Disable weak algorithms for security
+    self.options.no_md2 = True
+    self.options.no_rc5 = True
+    
+    # Enable modern algorithms
+    self.options.enable_quic = True
+```
+
+### Platform-Specific Optimizations
+```python
+def configure_platform_optimizations():
+    """Configure platform-specific optimizations"""
+    if self.settings.os == "Linux":
+        # Enable Linux-specific optimizations
+        self.options.no_threads = False
+        
+    elif self.settings.os == "Windows":
+        # Windows-specific configurations
+        self.options.no_stdio = False
+        
+    elif self.settings.os == "Macos":
+        # macOS-specific optimizations
+        self.options.enable_trace = True
+```
+
+### Memory and Performance Tuning
+```python
+def configure_performance_settings():
+    """Configure performance-related settings"""
+    # Memory debugging for development
+    if self.settings.build_type == "Debug":
+        self.options.enable_crypto_mdebug = True
+        self.options.enable_crypto_mdebug_backtrace = True
+        
+    # Performance optimizations for release
+    if self.settings.build_type == "Release":
+        self.options.enable_unit_test = False  # Skip tests for performance
+        self.options.no_asm = False  # Enable assembly optimizations
+```
+
+## Advanced Build Techniques
+
+### Incremental Build Optimization
+```python
+def optimize_incremental_builds():
+    """Optimize incremental build performance"""
+    # Use proper dependency tracking
+    # Implement smart rebuild detection
+    # Cache intermediate build artifacts
+    # Use build graph analysis
+    pass
+```
+
+### Cross-Compilation Support
+```python
+def setup_cross_compilation():
+    """Set up cross-compilation environment"""
+    # Configure cross-compilation toolchain
+    # Set up sysroot and libraries
+    # Configure target-specific options
+    # Handle platform-specific dependencies
+    pass
+```
+
+### Build Artifact Management
+```python
+def manage_build_artifacts():
+    """Manage build artifacts efficiently"""
+    # Clean old artifacts
+    # Compress large artifacts
+    # Store artifacts in registry
+    # Implement artifact lifecycle
+    pass
+```
+
+## CI/CD Build Optimization
+
+### Parallel Job Optimization
+```yaml
+# Optimize parallel job execution
+strategy:
+  matrix:
+    include:
+      - profile: linux-gcc11
+        parallel_jobs: 8
+      - profile: linux-clang15
+        parallel_jobs: 8
+      - profile: windows-vs2022
+        parallel_jobs: 4  # Windows typically has fewer cores
+```
+
+### Cache Optimization
+```yaml
+# Multi-level caching strategy
+steps:
+  - name: Cache Conan packages
+    uses: actions/cache@v4
+    with:
+      path: ~/.conan2
+      key: conan-${{ runner.os }}-${{ hashFiles('conanfile.py', 'conan/locks/*.lock') }}
+      
+  - name: Cache compiler cache
+    uses: actions/cache@v4
+    with:
+      path: /tmp/ccache
+      key: ccache-${{ runner.os }}-${{ github.sha }}
+      
+  - name: Cache build artifacts
+    uses: actions/cache@v4
+    with:
+      path: build/
+      key: build-${{ runner.os }}-${{ github.sha }}
+```
+
+### Resource Optimization
+```yaml
+# Optimize resource usage
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set optimal parallel jobs
+        run: |
+          JOBS=$(nproc)
+          echo "CONAN_CPU_COUNT=$JOBS" >> $GITHUB_ENV
+          echo "MAKEFLAGS=-j$JOBS" >> $GITHUB_ENV
+```
+
+## Build Monitoring and Analytics
+
+### Build Performance Metrics
+```python
+def collect_build_metrics():
+    """Collect comprehensive build performance metrics"""
+    metrics = {
+        'build_time': time.time() - start_time,
+        'cache_hits': cache_hit_count,
+        'cache_misses': cache_miss_count,
+        'parallel_jobs': parallel_job_count,
+        'memory_usage': peak_memory_usage,
+        'disk_usage': disk_space_used
+    }
+    
+    # Store metrics for analysis
+    with open('build_metrics.json', 'w') as f:
+        json.dump(metrics, f, indent=2)
+```
+
+### Build Analysis
+```python
+def analyze_build_performance():
+    """Analyze build performance and identify bottlenecks"""
+    # Analyze build times
+    # Identify slow components
+    # Recommend optimizations
+    # Generate performance report
+    pass
+```
+
+### Optimization Recommendations
+```python
+def generate_optimization_recommendations():
+    """Generate optimization recommendations"""
+    # Analyze current performance
+    # Compare with benchmarks
+    # Recommend specific optimizations
+    # Provide implementation guidance
+    pass
+```
+
+## Quality Assurance
+
+### Build Validation
+```python
+def validate_build_output():
+    """Validate build output quality"""
+    # Check binary compatibility
+    # Validate library exports
+    # Test functionality
+    # Verify security properties
+    pass
+```
+
+### Performance Testing
+```python
+def run_performance_tests():
+    """Run comprehensive performance tests"""
+    # Benchmark cryptographic operations
+    # Test memory usage
+    # Measure build performance
+    # Compare with previous versions
+    pass
+```
+
+## Best Practices Summary
+
+1. **Hermetic Builds**: Use pinned toolchains for reproducibility
+2. **Intelligent Caching**: Implement multi-level caching strategies
+3. **Parallel Execution**: Optimize parallel job execution
+4. **Platform Optimization**: Use platform-specific optimizations
+5. **Performance Monitoring**: Collect and analyze build metrics
+6. **Quality Validation**: Validate build output quality
+7. **Resource Management**: Optimize resource usage
+8. **Incremental Builds**: Optimize incremental build performance
+9. **Cross-Platform**: Support cross-compilation efficiently
+10. **Documentation**: Document optimization strategies
+
+These rules ensure optimal build performance for OpenSSL development while maintaining quality and reliability.

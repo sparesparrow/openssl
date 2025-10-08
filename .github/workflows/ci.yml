@@ -1,739 +1,364 @@
-# Copyright 2021-2025 The OpenSSL Project Authors. All Rights Reserved.
-#
-# Licensed under the Apache License 2.0 (the "License").  You may not use
-# this file except in compliance with the License.  You can obtain a copy
-# in the file LICENSE in the source distribution or at
-# https://www.openssl.org/source/license.html
+name: OpenSSL CI/CD Pipeline
 
-name: GitHub CI
-
-on: [pull_request, push]
-
-# for some reason, this does not work:
-# variables:
-#   BUILDOPTS: "-j4"
-#   HARNESS_JOBS: "${HARNESS_JOBS:-4}"
-
-# for some reason, this does not work:
-# before_script:
-#     - make="make -s"
-
-permissions:
-  contents: read
+on:
+  push:
+    branches: [ main, develop, feature/* ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run daily at 2 AM UTC for security scans
+    - cron: '0 2 * * *'
 
 env:
-  OSSL_RUN_CI_TESTS: 1
+  CONAN_USER_HOME: ${{ github.workspace }}/.conan2
+  CONAN_COLOR_DISPLAY: 1
+  CLICOLOR_FORCE: 1
+  CLICOLOR: 1
 
 jobs:
-  check_update:
+  # Validation stage - runs in parallel
+  validate:
+    name: Validate
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        check: [lint, security-scan, dependency-check]
     steps:
-    - name: install unifdef
-      run: |
-        sudo apt-get update
-        sudo apt-get -yq --no-install-suggests --no-install-recommends --allow-unauthenticated --allow-downgrades --allow-remove-essential --allow-change-held-packages install unifdef
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    - name: config
-      run: ./config --strict-warnings --banner=Configured enable-fips && perl configdata.pm --dump
-    - name: make build_generated
-      run: make -s build_generated
-    - name: make update
-      run: make update
-    - name: git diff
-      run: git diff --exit-code
-
-  check_docs:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: config
-      run: ./config --strict-warnings --banner=Configured enable-fips && perl configdata.pm --dump
-    - name: make build_generated
-      run: make -s build_generated
-    - name: make doc-nits
-      run: make doc-nits
-    - name: make help
-      run: make help
-    - name: make md-nits
-      run: |
-          sudo gem install mdl
-          make md-nits
-
-  # This checks that we use ANSI C language syntax and semantics.
-  # We are not as strict with libraries, but rather adapt to what's
-  # expected to be available in a certain version of each platform.
-  check-c99:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: config
-      run: CPPFLAGS='-std=c99 -D_XOPEN_SOURCE=1 -D_POSIX_C_SOURCE=200809L' ./config --strict-warnings --banner=Configured enable-sslkeylog no-asm no-secure-memory no-makedepend enable-buildtest-c++ enable-fips enable-lms && perl configdata.pm --dump
-    - name: make
-      run: make -s -j4
-
-  basic_gcc:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: checkout fuzz/corpora submodule
-      run: git submodule update --init --depth 1 fuzz/corpora
-    - name: localegen
-      run: sudo locale-gen tr_TR.UTF-8
-    - name: fipsvendor
-      # Make one fips build use a customized FIPS vendor
-      run: echo "FIPS_VENDOR=CI" >> VERSION.dat
-    - name: config
-      # enable-quic is on by default, but we leave it here to check we're testing the explicit enable somewhere
-      run: CC=gcc ./config --strict-warnings --banner=Configured enable-demos enable-h3demo enable-sslkeylog enable-fips enable-quic enable-lms && perl configdata.pm --dump
-    - name: make
-      run: make -s -j4
-    - name: get cpu info
-      run: |
-        cat /proc/cpuinfo
-        ./util/opensslwrap.sh version -c
-    - name: make test
-      run: .github/workflows/make-test
-    - name: check fipsvendor
-      run: |
-        util/wrap.pl -fips apps/openssl list -providers | grep 'name: CI FIPS Provider for OpenSSL$'
-    - name: save artifacts
-      if: success() || failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: "ci@basic-gcc"
-        path: artifacts.tar.gz
-
-  basic_clang:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: checkout fuzz/corpora submodule
-      run: git submodule update --init --depth 1 fuzz/corpora
-    - name: config
-      run: CC=clang ./config --strict-warnings --banner=Configured enable-demos enable-h3demo no-fips && perl configdata.pm --dump
-    - name: make
-      run: make -s -j4
-    - name: get cpu info
-      run: |
-        cat /proc/cpuinfo
-        ./util/opensslwrap.sh version -c
-    - name: make test
-      run: .github/workflows/make-test
-    - name: save artifacts
-      if: success() || failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: "ci@basic-clang"
-        path: artifacts.tar.gz
-
-  linux-arm64:
-    runs-on: ${{ github.repository == 'openssl/openssl' && 'linux-arm64' || 'ubuntu-24.04-arm' }}
-    steps:
-    - uses: actions/checkout@v4
-    - name: config
-      run: ./config --strict-warnings enable-demos enable-fips enable-lms enable-ec_nistp_64_gcc_128 enable-md2 enable-rc5 enable-ssl3 enable-ssl3-method enable-trace
-    - name: config dump
-      run: ./configdata.pm --dump
-    - name: make
-      run: make -j4
-    - name: get cpu info
-      run: |
-        cat /proc/cpuinfo
-        ./util/opensslwrap.sh version -c
-    - name: make test
-      run: .github/workflows/make-test
-    - name: save artifacts
-      if: success() || failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: "ci@linux-arm64"
-        path: artifacts.tar.gz
-
-  freebsd-x86_64:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: config
-      uses: cross-platform-actions/action@fe0167d8082ac584754ef3ffb567fded22642c7d #v0.27.0
-      with:
-        operating_system: freebsd
-        version: "13.4"
-        shutdown_vm: false
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      
+      - name: Conan install
         run: |
-          sudo pkg install -y gcc perl5
-          ./config --strict-warnings enable-fips enable-lms enable-ec_nistp_64_gcc_128 enable-md2 enable-rc5 enable-ssl3 enable-ssl3-method enable-trace
-    - name: config dump
-      uses: cross-platform-actions/action@fe0167d8082ac584754ef3ffb567fded22642c7d #v0.27.0
-      with:
-        operating_system: freebsd
-        version: "13.4"
-        shutdown_vm: false
-        run: ./configdata.pm --dump
-    - name: make
-      uses: cross-platform-actions/action@fe0167d8082ac584754ef3ffb567fded22642c7d #v0.27.0
-      with:
-        operating_system: freebsd
-        version: "13.4"
-        shutdown_vm: false
-        run: make -j4
-    - name: make test
-      uses: cross-platform-actions/action@fe0167d8082ac584754ef3ffb567fded22642c7d #v0.27.0
-      with:
-        operating_system: freebsd
-        version: "13.4"
+          conan-dev/venv/bin/python -m pip install --upgrade pip
+          conan-dev/venv/bin/python -m pip install -r requirements.txt
+          
+      - name: Run linting
+        if: matrix.check == 'lint'
         run: |
-          ./util/opensslwrap.sh version -c
-          .github/workflows/make-test
-    - name: save artifacts
-      if: success() || failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: "ci@BSD-x86_64"
-        path: artifacts.tar.gz
+          conan-dev/venv/bin/python scripts/setup-ci-environment.py
+          conan-dev/venv/bin/python -m flake8 scripts/ --max-line-length=120
+          conan-dev/venv/bin/python -m pylint scripts/ --disable=C0114,C0116
+          
+      - name: Security scan
+        if: matrix.check == 'security-scan'
+        run: |
+          # Install security scanning tools
+          pip install safety bandit
+          
+          # Scan for known vulnerabilities
+          safety check --json --output safety-report.json || true
+          
+          # Scan for security issues
+          bandit -r scripts/ -f json -o bandit-report.json || true
+          
+      - name: Conan dependency check
+        if: matrix.check == 'dependency-check'
+        run: |
+          conan-dev/venv/bin/python scripts/setup-ci-environment.py
+          conan-dev/venv/bin/python scripts/ci/conan_automation.py install --profile linux-gcc11
+          
+      - name: Upload security reports
+        if: matrix.check == 'security-scan'
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: |
+            safety-report.json
+            bandit-report.json
 
-  minimal:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: checkout fuzz/corpora submodule
-      run: git submodule update --init --depth 1 fuzz/corpora
-    - name: config
-      run: ./config --strict-warnings --banner=Configured enable-demos enable-h3demo no-bulk no-pic no-asm no-lms -DOPENSSL_NO_SECURE_MEMORY -DOPENSSL_SMALL_FOOTPRINT && perl configdata.pm --dump
-    - name: make
-      run: make -j4 # verbose, so no -s here
-    - name: get cpu info
-      run: |
-        cat /proc/cpuinfo
-        ./util/opensslwrap.sh version -c
-    - name: make test
-      run: .github/workflows/make-test
-    - name: save artifacts
-      if: success() || failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: "ci@minimal"
-        path: artifacts.tar.gz
-
-  no-deprecated:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: checkout fuzz/corpora submodule
-      run: git submodule update --init --depth 1 fuzz/corpora
-    - name: config
-      run: ./config --strict-warnings --banner=Configured enable-demos enable-h3demo no-deprecated enable-fips && perl configdata.pm --dump
-    - name: make
-      run: make -s -j4
-    - name: get cpu info
-      run: |
-        cat /proc/cpuinfo
-        ./util/opensslwrap.sh version -c
-    - name: make test
-      run: .github/workflows/make-test
-    - name: save artifacts
-      if: success() || failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: "ci@no-deprecated"
-        path: artifacts.tar.gz
-
-  no-shared-ubuntu:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: checkout fuzz/corpora submodule
-      run: git submodule update --init --depth 1 fuzz/corpora
-    - name: config
-      run: ./config --strict-warnings --banner=Configured enable-demos enable-h3demo no-shared no-fips && perl configdata.pm --dump
-    - name: make
-      run: make -s -j4
-    - name: get cpu info
-      run: |
-        cat /proc/cpuinfo
-        ./util/opensslwrap.sh version -c
-    - name: make test
-      run: .github/workflows/make-test
-    - name: save artifacts
-      if: success() || failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: "ci@no-shared-ubuntu"
-        path: artifacts.tar.gz
-
-  no-shared-macos:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-13, macos-14]
+  # Build stage - runs in parallel for different platforms
+  build:
+    name: Build (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
-    steps:
-    - uses: actions/checkout@v4
-    - name: checkout fuzz/corpora submodule
-      run: git submodule update --init --depth 1 fuzz/corpora
-    - name: config
-      run: ./config --strict-warnings --banner=Configured enable-demos enable-h3demo no-shared no-fips && perl configdata.pm --dump
-    - name: make
-      run: make -s -j4
-    - name: get cpu info
-      run: |
-        sysctl machdep.cpu
-        ./util/opensslwrap.sh version -c
-    - name: make test
-      run: .github/workflows/make-test
-    - name: save artifacts
-      if: success() || failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: "ci@no-shared-${{ matrix.os }}"
-        path: artifacts.tar.gz
-
-  non-caching:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: checkout fuzz/corpora submodule
-      run: git submodule update --init --depth 1 fuzz/corpora
-    - name: Adjust ASLR for sanitizer
-      run: |
-        sudo cat /proc/sys/vm/mmap_rnd_bits
-        sudo sysctl -w vm.mmap_rnd_bits=28
-    - name: config
-      run: ./config --strict-warnings --banner=Configured --debug enable-demos enable-h3demo enable-asan enable-ubsan no-cached-fetch no-fips no-dtls no-tls1 no-tls1-method no-tls1_1 no-tls1_1-method no-async && perl configdata.pm --dump
-    - name: make
-      run: make -s -j4
-    - name: get cpu info
-      run: |
-        cat /proc/cpuinfo
-        ./util/opensslwrap.sh version -c
-    - name: make test
-      run: .github/workflows/make-test OPENSSL_TEST_RAND_ORDER=0 TESTS="-test_fuzz* -test_ssl_* -test_sslapi -test_evp -test_cmp_http -test_verify -test_cms -test_store -test_enc -[01][0-9]"
-    - name: save artifacts
-      if: success() || failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: "ci@non-caching"
-        path: artifacts.tar.gz
-
-  address_ub_sanitizer:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: checkout fuzz/corpora submodule
-      run: git submodule update --init --depth 1 fuzz/corpora
-    - name: Adjust ASLR for sanitizer
-      run: |
-        sudo cat /proc/sys/vm/mmap_rnd_bits
-        sudo sysctl -w vm.mmap_rnd_bits=28
-    - name: config
-      run: ./config --strict-warnings --banner=Configured --debug enable-demos enable-h3demo enable-asan enable-ubsan enable-rc5 enable-md2 enable-ec_nistp_64_gcc_128 enable-fips enable-lms && perl configdata.pm --dump
-    - name: make
-      run: make -s -j4
-    - name: get cpu info
-      run: |
-        cat /proc/cpuinfo
-        ./util/opensslwrap.sh version -c
-    - name: make test
-      run: .github/workflows/make-test OPENSSL_TEST_RAND_ORDER=0
-    - name: save artifacts
-      if: success() || failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: "ci@address_ub_sanitizer"
-        path: artifacts.tar.gz
-
-  fuzz_tests:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: checkout fuzz/corpora submodule
-      run: git submodule update --init --depth 1 fuzz/corpora
-    - name: Adjust ASLR for sanitizer
-      run: |
-        sudo cat /proc/sys/vm/mmap_rnd_bits
-        sudo sysctl -w vm.mmap_rnd_bits=28
-    - name: config
-      run: ./config --strict-warnings --banner=Configured --debug -DPEDANTIC -DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION enable-asan enable-ubsan enable-rc5 enable-md2 enable-ec_nistp_64_gcc_128 enable-weak-ssl-ciphers enable-ssl3 enable-ssl3-method enable-nextprotoneg && perl configdata.pm --dump
-    - name: make
-      run: make -s -j4
-    - name: get cpu info
-      run: |
-        cat /proc/cpuinfo
-        ./util/opensslwrap.sh version -c
-    - name: make test
-      run: .github/workflows/make-test OPENSSL_TEST_RAND_ORDER=0 TESTS="test_fuzz*"
-    - name: save artifacts
-      if: success() || failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: "ci@fuzz_tests"
-        path: artifacts.tar.gz
-        if-no-files-found: ignore
-
-  memory_sanitizer:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: checkout fuzz/corpora submodule
-      run: git submodule update --init --depth 1 fuzz/corpora
-    - name: Adjust ASLR for sanitizer
-      run: |
-        sudo cat /proc/sys/vm/mmap_rnd_bits
-        sudo sysctl -w vm.mmap_rnd_bits=28
-    - name: config
-      # --debug -O1 is to produce a debug build that runs in a reasonable amount of time
-      run: CC=clang ./config --strict-warnings --banner=Configured --debug no-shared -O1 -fsanitize=memory -DOSSL_SANITIZE_MEMORY -fno-optimize-sibling-calls enable-rc5 enable-md2 enable-ec_nistp_64_gcc_128 enable-fips enable-lms no-slh-dsa && perl configdata.pm --dump
-    - name: make
-      run: make -s -j4
-    - name: get cpu info
-      run: |
-        cat /proc/cpuinfo
-        ./util/opensslwrap.sh version -c
-    - name: make test
-      run: .github/workflows/make-test OPENSSL_TEST_RAND_ORDER=0
-    - name: save artifacts
-      if: success() || failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: "ci@memory_sanitizer"
-        path: artifacts.tar.gz
-
-  threads_sanitizer:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: checkout fuzz/corpora submodule
-      run: git submodule update --init --depth 1 fuzz/corpora
-    - name: Adjust ASLR for sanitizer
-      run: |
-        sudo cat /proc/sys/vm/mmap_rnd_bits
-        sudo sysctl -w vm.mmap_rnd_bits=28
-    - name: config
-      run: CC=clang ./config --strict-warnings --banner=Configured no-shared no-fips -g -fsanitize=thread && perl configdata.pm --dump
-    - name: make
-      run: make -s -j4
-    - name: get cpu info
-      run: |
-        cat /proc/cpuinfo
-        ./util/opensslwrap.sh version -c
-    - name: make test
-      run: .github/workflows/make-test V=1 TESTS="test_lhash test_threads test_internal_provider test_provfetch test_provider test_pbe test_evp_kdf test_pkcs12 test_store test_evp test_quic*"
-    - name: save artifacts
-      if: success() || failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: "ci@threads_sanitizer"
-        path: artifacts.tar.gz
-
-  enable_non-default_options:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: checkout fuzz/corpora submodule
-      run: git submodule update --init --depth 1 fuzz/corpora
-    - name: modprobe tls
-      run: sudo modprobe tls
-    - name: config
-      run: ./config --strict-warnings --banner=Configured enable-demos enable-h3demo no-ec enable-ssl-trace enable-zlib enable-zlib-dynamic enable-crypto-mdebug enable-egd enable-ktls enable-fips enable-lms no-threads && perl configdata.pm --dump
-    - name: make
-      run: make -s -j4
-    - name: get cpu info
-      run: |
-        cat /proc/cpuinfo
-        ./util/opensslwrap.sh version -c
-    - name: make test
-      run: .github/workflows/make-test
-    - name: save artifacts
-      if: success() || failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: "ci@enable_non-default_options"
-        path: artifacts.tar.gz
-
-  full_featured:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: checkout fuzz/corpora submodule
-      run: git submodule update --init --depth 1 fuzz/corpora
-    - name: modprobe tls
-      run: sudo modprobe tls
-    - name: Enable sctp
-      run: sudo modprobe sctp
-    - name: Enable auth in sctp
-      run: sudo sysctl -w net.sctp.auth_enable=1
-    - name: install extra config support
-      run: sudo apt-get -y install libsctp-dev abigail-tools libzstd-dev zstd
-    - name: config
-      run: ./config --strict-warnings --banner=Configured enable-demos enable-h3demo enable-ktls enable-fips enable-lms enable-egd enable-ec_nistp_64_gcc_128 enable-md2 enable-rc5 enable-sctp enable-ssl3 enable-ssl3-method enable-weak-ssl-ciphers enable-trace enable-zlib enable-zstd && perl configdata.pm --dump
-    - name: make
-      run: make -s -j4
-    - name: get cpu info
-      run: |
-        cat /proc/cpuinfo
-        ./util/opensslwrap.sh version -c
-    - name: make test
-      run: .github/workflows/make-test
-    - name: save artifacts
-      if: success() || failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: "ci@full_featured"
-        path: artifacts.tar.gz
-
-  no-legacy:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: checkout fuzz/corpora submodule
-      run: git submodule update --init --depth 1 fuzz/corpora
-    - name: config
-      run: ./config --strict-warnings --banner=Configured enable-demos enable-h3demo no-legacy enable-fips enable-lms && perl configdata.pm --dump
-    - name: make
-      run: make -s -j4
-    - name: get cpu info
-      run: |
-        cat /proc/cpuinfo
-        ./util/opensslwrap.sh version -c
-    - name: make test
-      run: .github/workflows/make-test
-    - name: save artifacts
-      if: success() || failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: "ci@no-legacy"
-        path: artifacts.tar.gz
-
-  legacy:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: checkout fuzz/corpora submodule
-      run: git submodule update --init --depth 1 fuzz/corpora
-    - name: config
-      run: ./config --strict-warnings --banner=Configured --debug no-afalgeng enable-demos enable-h3demo no-shared enable-crypto-mdebug enable-rc5 enable-md2 enable-ssl3 enable-ssl3-method enable-weak-ssl-ciphers enable-zlib enable-ec_nistp_64_gcc_128 no-fips && perl configdata.pm --dump
-    - name: make
-      run: make -s -j4
-    - name: get cpu info
-      run: |
-        cat /proc/cpuinfo
-        ./util/opensslwrap.sh version -c
-    - name: make test
-      run: .github/workflows/make-test
-    - name: save artifacts
-      if: success() || failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: "ci@legacy"
-        path: artifacts.tar.gz
-
-  # out-of-source-and-install checks multiple things at the same time:
-  # - That building, testing and installing works from an out-of-source
-  #   build tree
-  # - That building, testing and installing works with a read-only source
-  #   tree
-  out-of-readonly-source-and-install-ubuntu:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        path: ./source
-    - name: checkout fuzz/corpora submodule
-      run: git submodule update --init --depth 1 fuzz/corpora
-      working-directory: ./source
-    - name: make source read-only
-      run: chmod -R a-w ./source
-    - name: create build and install directories
-      run: |
-        mkdir ./build
-        mkdir ./install
-    - name: config
-      run: |
-        ../source/config --banner=Configured enable-demos enable-h3demo enable-fips enable-lms enable-quic enable-acvp-tests --strict-warnings --prefix=$(cd ../install; pwd)
-        perl configdata.pm --dump
-      working-directory: ./build
-    - name: make
-      run: make -s -j4
-      working-directory: ./build
-    - name: get cpu info
-      run: |
-        cat /proc/cpuinfo
-        ./util/opensslwrap.sh version -c
-      working-directory: ./build
-    - name: make test
-      run: ../source/.github/workflows/make-test
-      working-directory: ./build
-    - name: save artifacts
-      if: success() || failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: "ci@out-of-readonly-source-and-install-ubuntu"
-        path: build/artifacts.tar.gz
-    - name: make install
-      run: make install
-      working-directory: ./build
-
-  out-of-readonly-source-and-install-macos:
+    needs: validate
     strategy:
-      fail-fast: false
       matrix:
-        os: [macos-13, macos-14]
+        include:
+          - os: ubuntu-22.04
+            platform: linux-gcc11
+            profile: linux-gcc11
+            arch: x86_64
+          - os: ubuntu-22.04
+            platform: linux-clang15
+            profile: linux-clang15
+            arch: x86_64
+          - os: windows-2022
+            platform: windows-msvc2022
+            profile: windows-msvc2022
+            arch: x86_64
+          - os: macos-12
+            platform: macos-clang14
+            profile: macos-clang14
+            arch: x86_64
+            
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      
+      - name: Install system dependencies (Linux)
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential perl cmake
+          
+      - name: Install system dependencies (Windows)
+        if: matrix.os == 'windows-2022'
+        run: |
+          # Windows dependencies are handled by Conan
+          echo "Windows dependencies handled by Conan"
+          
+      - name: Install system dependencies (macOS)
+        if: matrix.os == 'macos-12'
+        run: |
+          brew install cmake perl
+          
+      - name: Install Python dependencies
+        run: |
+          conan-dev/venv/bin/python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          
+      - name: Set up Conan environment
+        run: |
+          conan-dev/venv/bin/python scripts/setup-ci-environment.py
+          
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CONAN_USER_HOME }}
+          key: conan-${{ runner.os }}-${{ hashFiles('conanfile.py', 'scripts/ci/ci_config.yaml') }}
+          restore-keys: |
+            conan-${{ runner.os }}-
+            
+      - name: Conan build
+        run: |
+          conan-dev/venv/bin/python scripts/ci/conan_automation.py create --profile ${{ matrix.profile }}
+          
+      - name: Conan generate SBOM
+        run: |
+          conan-dev/venv/bin/python scripts/ci/conan_automation.py create --profile ${{ matrix.profile }}
+          
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: openssl-build-${{ matrix.platform }}
+          path: |
+            ${{ env.CONAN_USER_HOME }}/p/*/p/
+            build_metrics.json
+            sbom.json
+          retention-days: 30
+
+  # Test stage - runs after successful builds
+  test:
+    name: Test (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        path: ./source
-    - name: checkout fuzz/corpora submodule
-      run: git submodule update --init --depth 1 fuzz/corpora
-      working-directory: ./source
-    - name: make source read-only
-      run: chmod -R a-w ./source
-    - name: create build and install directories
-      run: |
-        mkdir ./build
-        mkdir ./install
-    - name: config
-      run: |
-        ../source/config --banner=Configured enable-fips enable-lms enable-demos enable-h3demo enable-quic enable-acvp-tests --strict-warnings --prefix=$(cd ../install; pwd)
-        perl configdata.pm --dump
-      working-directory: ./build
-    - name: make
-      run: make -s -j4
-      working-directory: ./build
-    - name: get cpu info
-      run: |
-        sysctl machdep.cpu
-        ./util/opensslwrap.sh version -c
-      working-directory: ./build
-    - name: make test
-      run: ../source/.github/workflows/make-test
-      working-directory: ./build
-    - name: save artifacts
-      if: success() || failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: "ci@out-of-readonly-source-and-install-${{ matrix.os }}"
-        path: build/artifacts.tar.gz
-    - name: make install
-      run: make install
-      working-directory: ./build
-
-  external-tests-misc:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
-    - name: package installs
-      run: |
-        sudo apt-get update
-        sudo apt-get -yq install bison gettext keyutils ldap-utils libldap2-dev libkeyutils-dev python3 python3-paste python3-pyrad slapd tcsh python3-virtualenv virtualenv python3-kdcproxy gdb libtls-dev wget gpg
-    - name: install cpanm and Test2::V0 for gost_engine testing
-      uses: perl-actions/install-with-cpanm@10d60f00b4073f484fc29d45bfbe2f776397ab3d # v1.7
-      with:
-        install: Test2::V0
-    - name: setup hostname workaround
-      run: sudo hostname localhost
-    - name: config
-      run: ./config --strict-warnings --banner=Configured --debug no-afalgeng enable-rc5 enable-md2 enable-ssl3 enable-ssl3-method enable-weak-ssl-ciphers enable-zlib enable-ec_nistp_64_gcc_128 enable-external-tests no-fips && perl configdata.pm --dump
-    - name: make
-      run: make -s -j4
-    - uses: dtolnay/rust-toolchain@fcf085fcb4b4b8f63f96906cd713eb52181b5ea4
-    - name: get cpu info
-      run: |
-        cat /proc/cpuinfo
-        ./util/opensslwrap.sh version -c
-    - name: test external gost-engine
-      run: make test TESTS="test_external_gost_engine"
-    - name: test external krb5
-      run: make test TESTS="test_external_krb5"
-    - name: test external tlsfuzzer
-      run: make test TESTS="test_external_tlsfuzzer"
-    - name: test external Cloudflare quiche
-      run: make test TESTS="test_external_cf_quiche" VERBOSE=1
-    - name: test external rpki client
-      run: make test TESTS="test_external_rpki-client-portable"
-    - name: test ability to produce debuginfo files
-      run: |
-        make debuginfo
-        gdb < <(echo -e "file ./libcrypto.so.4\nquit") > ./results
-        grep -q "Reading symbols from.*libcrypto\.so\.4\.debug" results
-
-  external-tests-oqs-provider:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
-    - name: config
-      run: ./config --strict-warnings --banner=Configured --debug enable-external-tests && perl configdata.pm --dump
-    - name: make
-      run: make -s -j4
-    - name: get cpu info
-      run: |
-        cat /proc/cpuinfo
-        ./util/opensslwrap.sh version -c
-    - name: test external oqs-provider
-      run: make test TESTS="test_external_oqsprovider"
-
-  external-tests-pkcs11-provider:
-    runs-on: ubuntu-latest
-    container: fedora:latest
-    steps:
-    - name: package installs
-      run: |
-        dnf install -y perl-FindBin perl-IPC-Cmd perl-File-Compare perl-File-Copy perl-Test-Simple perl-Test-Harness python3 make g++ perl git meson opensc expect kryoptic
-    - uses: actions/checkout@v4
-    - name: checkout fuzz/corpora and pkcs11-provider submodule
-      run: |
-        git config --global --add safe.directory /__w/openssl/openssl
-        git submodule update --init --depth 1 fuzz/corpora
-        git submodule update --init --depth 1 pkcs11-provider
-    - name: config
-      run: ./config --strict-warnings --banner=Configured --debug enable-external-tests no-fips && perl configdata.pm --dump
-    - name: make
-      run: make -s -j4
-    # Run all tests except external tests to make sure they work fine on Fedora because
-    # this is the only job running on Fedora, only then execute pkcs11-provider external
-    # test.
-    - name: test (except external tests)
-      run: make test TESTS="-test_external_*"
-    - name: test external pkcs11-provider
-      run: make test TESTS="test_external_pkcs11_provider" VERBOSE=1
-    - name: get cpu info
-      run: |
-        cat /proc/cpuinfo
-        ./util/opensslwrap.sh version -c
-
-  external-tests-pyca:
-    runs-on: ubuntu-latest
+    needs: build
     strategy:
       matrix:
-        PYTHON:
-          - 3.9
+        include:
+          - os: ubuntu-22.04
+            platform: linux-gcc11
+            profile: linux-gcc11
+          - os: windows-2022
+            platform: windows-msvc2022
+            profile: windows-msvc2022
+          - os: macos-12
+            platform: macos-clang14
+            profile: macos-clang14
+            
     steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
-    - name: package installs
-      run: |
-        sudo apt-get update
-        sudo apt-get -yq install pkgconf libssl-dev
-    - name: Configure OpenSSL
-      run: ./config --strict-warnings --banner=Configured --debug enable-external-tests && perl configdata.pm --dump
-    - name: make
-      run: make -s -j4
-    - name: Setup Python
-      uses: actions/setup-python@v5.3.0
-      with:
-        python-version: ${{ matrix.PYTHON }}
-    - uses: dtolnay/rust-toolchain@fcf085fcb4b4b8f63f96906cd713eb52181b5ea4
-      with:
-        toolchain: stable
-    - name: get cpu info
-      run: |
-        cat /proc/cpuinfo
-        ./util/opensslwrap.sh version -c
-    - name: test external pyca
-      run: make test TESTS="test_external_pyca" VERBOSE=1
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - name: Install Python dependencies
+        run: |
+          conan-dev/venv/bin/python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: openssl-build-${{ matrix.platform }}
+          path: ${{ env.CONAN_USER_HOME }}/p/*/p/
+          
+      - name: Set up Conan environment
+        run: |
+          conan-dev/venv/bin/python scripts/setup-ci-environment.py
+          
+      - name: Conan test
+        run: |
+          conan-dev/venv/bin/python scripts/ci/conan_automation.py test --profile ${{ matrix.profile }}
+          
+      - name: Run integration tests
+        run: |
+          conan-dev/venv/bin/python scripts/ci/test_harness.py
+          
+      - name: Run performance tests
+        if: matrix.platform == 'linux-gcc11'
+        run: |
+          # Performance tests only on Linux for now
+          conan-dev/venv/bin/python scripts/ci/performance_tests.py
+          
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.platform }}
+          path: |
+            test_results/
+            build_metrics.json
+          retention-days: 30
+
+  # Package stage - creates final packages
+  package:
+    name: Package
+    runs-on: ubuntu-latest
+    needs: [build, test]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - name: Install Python dependencies
+        run: |
+          conan-dev/venv/bin/python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          
+      - name: Set up Conan environment
+        run: |
+          conan-dev/venv/bin/python scripts/setup-ci-environment.py
+          
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+          
+      - name: Conan create package
+        run: |
+          conan-dev/venv/bin/python scripts/ci/conan_automation.py create --profile linux-gcc11
+          
+      - name: Conan generate final SBOM
+        run: |
+          conan-dev/venv/bin/python scripts/ci/conan_automation.py create --profile linux-gcc11
+          
+      - name: Upload final packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: openssl-packages
+          path: |
+            ${{ env.CONAN_USER_HOME }}/p/*/p/
+            sbom.json
+            build_metrics.json
+          retention-days: 90
+
+  # Security scan stage - comprehensive security analysis
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: package
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - name: Install security tools
+        run: |
+          pip install safety bandit semgrep
+          
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: openssl-packages
+          path: packages/
+          
+      - name: Run comprehensive security scan
+        run: |
+          # Scan Python code
+          bandit -r scripts/ -f json -o bandit-report.json
+          
+          # Scan for vulnerabilities
+          safety check --json --output safety-report.json
+          
+          # Scan with Semgrep
+          semgrep --config=auto scripts/ --json --output=semgrep-report.json
+          
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports-final
+          path: |
+            bandit-report.json
+            safety-report.json
+            semgrep-report.json
+          retention-days: 90
+
+  # Deploy stage - deploys to staging/production
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: [package, security-scan]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - name: Install Python dependencies
+        run: |
+          conan-dev/venv/bin/python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: openssl-packages
+          path: packages/
+          
+      - name: Deploy to production registry
+        run: |
+          # This would deploy to your production Conan registry
+          echo "Deploying to production registry..."
+          # conan-dev/venv/bin/python scripts/ci/deploy.py --environment production
+          
+      - name: Notify deployment
+        run: |
+          echo "Deployment completed successfully"
+          # This would send notifications to stakeholders

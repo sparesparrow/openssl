@@ -1,0 +1,30 @@
+---
+description: SQLite schema validation practices (tooling, diffs, CI gates)
+globs: ["scripts/**/*.py", ".github/workflows/**/*.yml", "**/*.sql", "**/*.db"]
+alwaysApply: true
+---
+
+# SQLite Schema Validation Rules
+
+Borrowing the robust schema comparison approach from oms-dev to ensure DB consistency in tests and fixtures.
+
+## Tooling
+- Use a dedicated SQLite diff tool (e.g., `sqlite-tools`) capable of schema-only diffs.
+- Wrap the tool with a Python helper to normalize output and filter index-only differences.
+
+## Recommended API
+```python
+from pathlib import Path
+
+def compare_sqlite_schema(base_db: Path, candidate_db: Path, diff_exe: Path) -> list[str]:
+    # Execute tool, normalize, drop INDEX-only diffs, return list of statements that differ
+    ...
+```
+
+## CI Gate
+- Fail when unexpected schema diffs appear.
+- Allow an opt-in env `SCHEMA_MISMATCH_RAISE_ERROR=0` during exploratory runs.
+
+## OpenSSL Usage
+- Apply to test datasets used by apps/providers.
+- Store approved baseline DBs under `test/fixtures/db/` and compare during CI.
