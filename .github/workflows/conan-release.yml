@@ -79,6 +79,10 @@ jobs:
           conan-dev/venv/bin/python scripts/setup-ci-environment.py
           conan-dev/venv/bin/python scripts/setup-ci-environment.py
       
+      - name: Pre-build validation
+        run: |
+          conan-dev/venv/bin/python scripts/validation/pre-build-validation.py --config conan-dev/validation-config.yml --strict
+      
       - name: Build release package
         run: |
           conan install . --profile=${{ matrix.profile }}
@@ -113,14 +117,27 @@ jobs:
           pip install conan
           conan profile detect --force
       
-      - name: Configure remote
+      - name: Configure remotes
         run: |
-          conan remote add production ${{ secrets.CONAN_REMOTE_URL }}
+          # Configure production remote
+          conan remote add production ${{ secrets.CONAN_REMOTE_URL }} || true
+          conan remote update production ${{ secrets.CONAN_REMOTE_URL }}
           conan user -p ${{ secrets.CONAN_REMOTE_PASSWORD }} -r production ${{ secrets.CONAN_REMOTE_USERNAME }}
+          
+          # Configure GitHub Packages as backup
+          conan remote add github-packages https://maven.pkg.github.com/${{ github.repository }} || true
+          conan user -p ${{ secrets.GITHUB_TOKEN }} -r github-packages ${{ github.actor }}
       
       - name: Upload to production
         run: |
-          conan upload "openssl/${{ needs.prepare-release.outputs.version }}@user/channel" -r=production --all --confirm
+          # Upload to primary production remote
+          conan upload "openssl/${{ needs.prepare-release.outputs.version }}@openssl/stable" -r=production --all --confirm --retry=3 --retry-wait=10 || {
+            echo "Production upload failed, attempting GitHub Packages backup"
+            conan upload "openssl/${{ needs.prepare-release.outputs.version }}@openssl/stable" -r=github-packages --all --confirm --retry=3 --retry-wait=10 || {
+              echo "All upload attempts failed"
+              exit 1
+            }
+          }
       
       - name: Create GitHub release
         uses: actions/create-release@v1

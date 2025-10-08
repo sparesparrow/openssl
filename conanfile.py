@@ -745,7 +745,7 @@ class OpenSSLConan(ConanFile):
             self.env_info.OPENSSL_CONF = os.path.join(self.package_folder, "ssl", "openssl.cnf")
             
     def package_id(self):
-        """Optimize package ID for better caching"""
+        """Optimize package ID for better caching with enhanced strategies"""
         # Runtime path options don't affect binary compatibility
         del self.info.options.openssldir
         del self.info.options.cafile  
@@ -783,6 +783,26 @@ class OpenSSLConan(ConanFile):
             delattr(self.info.options, "enable_buildtest_c++")
         except AttributeError:
             pass  # Option might be named differently
+        
+        # Enhanced cache key optimization
+        # Group compatible configurations for better cache reuse
+        if self.settings.build_type == "Debug":
+            # All debug builds can share cache regardless of specific debug options
+            self.info.settings.build_type = "Debug"
+        
+        # Group similar architectures for better cache reuse
+        if str(self.settings.arch) in ["x86_64", "amd64"]:
+            self.info.settings.arch = "x86_64"
+        elif str(self.settings.arch) in ["arm64", "aarch64"]:
+            self.info.settings.arch = "arm64"
+        
+        # Group compatible compiler versions
+        if str(self.settings.compiler) == "gcc":
+            if str(self.settings.compiler.version) in ["11", "12", "13"]:
+                self.info.settings.compiler.version = "11+"
+        elif str(self.settings.compiler) == "clang":
+            if str(self.settings.compiler.version) in ["14", "15", "16"]:
+                self.info.settings.compiler.version = "14+"
     
     def _setup_fuzz_corpora(self):
         """Set up fuzz corpora data from Conan package."""

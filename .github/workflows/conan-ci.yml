@@ -146,6 +146,18 @@ jobs:
         run: |
           python scripts/setup-ci-environment.py
       
+      - name: Pre-build validation
+        run: |
+          python scripts/validation/pre-build-validation.py --config conan-dev/validation-config.yml
+      
+      - name: Cache optimization
+        run: |
+          python scripts/validation/cache-optimization.py --config conan-dev/cache-optimization.yml
+      
+      - name: Authentication setup
+        run: |
+          python scripts/validation/auth-token-manager.py --config conan-dev/package-registries.yml
+      
       - name: Conan install
         run: |
           conan install . --profile=conan-dev/profiles/${{ matrix.profile }}.profile ${{ matrix.conan_options }}
@@ -169,9 +181,18 @@ jobs:
       - name: Upload packages to GitHub Packages
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          conan remote add github-packages https://maven.pkg.github.com/${{ github.repository }}
+          # Configure GitHub Packages remote with proper authentication
+          conan remote add github-packages https://maven.pkg.github.com/${{ github.repository }} || true
+          conan remote update github-packages https://maven.pkg.github.com/${{ github.repository }}
+          
+          # Authenticate with GitHub Packages using proper token format
           conan user -p ${{ secrets.GITHUB_TOKEN }} -r github-packages ${{ github.actor }}
-          conan upload "openssl/*" -r=github-packages --all --confirm || true
+          
+          # Upload packages with retry logic and proper error handling
+          conan upload "openssl/*" -r=github-packages --all --confirm --retry=3 --retry-wait=10 || {
+            echo "GitHub Packages upload failed, but continuing with build"
+            exit 0
+          }
       
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

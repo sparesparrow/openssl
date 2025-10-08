@@ -21,6 +21,11 @@ registries:
     enabled: true
     priority: 2
     description: "GitHub Packages registry for OpenSSL packages"
+    # GitHub Packages specific configuration
+    auth_header: "Authorization: Bearer ${GITHUB_TOKEN}"
+    retry_attempts: 3
+    retry_wait: 10
+    timeout: 300
     
   conan-center:
     name: "Conan Center"
