@@ -12,7 +12,7 @@ tools.system.package_manager:mode=install
 tools.system.package_manager:sudo=True
 
 [buildenv]
-CC=gcc-14
-CXX=g++-14
+CC=gcc
+CXX=g++
 CFLAGS=-O2 -g
 CXXFLAGS=-O2 -g
