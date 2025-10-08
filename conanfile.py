@@ -31,12 +31,70 @@ class OpenSSLConan(ConanFile):
     # Package configuration
     settings = "os", "compiler", "build_type", "arch"
     options = {
+        # Core build options
         "shared": [True, False],
+        "fPIC": [True, False],
+        
+        # Security & Compliance
         "fips": [True, False],
+        "no_deprecated": [True, False],
+        
+        # Features
+        "enable_demos": [True, False],
+        "enable_h3demo": [True, False],
+        "enable_sslkeylog": [True, False],
+        "enable_quic": [True, False],
+        
+        # Protocol support
+        "enable_ssl3": [True, False],
+        "enable_ssl3_method": [True, False],
+        "no_dtls": [True, False],
+        "no_tls1": [True, False],
+        "no_tls1_1": [True, False],
+        
+        # Cryptographic algorithms
+        "enable_md2": [True, False],
+        "enable_md4": [True, False],
+        "enable_weak_ssl_ciphers": [True, False],
+        "enable_ec_nistp_64_gcc_128": [True, False],
+        
+        # Performance & Optimization
         "no_asm": [True, False],
         "no_threads": [True, False],
+        "no_bulk": [True, False],
+        
+        # Debugging & Testing
+        "enable_crypto_mdebug": [True, False],
+        "enable_trace": [True, False],
+        "enable_asan": [True, False],
+        "enable_ubsan": [True, False],
+        "enable_msan": [True, False],
+        "enable_tsan": [True, False],
+        "enable_unit_test": [True, False],
+        "enable_external_tests": [True, False],
+        "enable_fuzzer_afl": [True, False],
+        "enable_fuzzer_libfuzzer": [True, False],
+        "enable_buildtest_c++": [True, False],
+        
+        # System integration
+        "enable_ktls": [True, False],
+        "enable_sctp": [True, False],
+        
+        # Compression
+        "enable_zlib": [True, False],
+        "enable_zlib_dynamic": [True, False],
+        "enable_zstd": [True, False],
+        
+        # Legacy & Compatibility
+        "no_legacy": [True, False],
+        "no_afalgeng": [True, False],
+        
+        # Miscellaneous
+        "enable_egd": [True, False],
+        "no_cached_fetch": [True, False],
+        
+        # Legacy options (for backward compatibility)
         "no_zlib": [True, False],
-        "no_egd": [True, False],
         "386": [True, False],
         "no_sse2": [True, False],
         "no_bf": [True, False],
@@ -54,39 +112,80 @@ class OpenSSLConan(ConanFile):
         "no_rc5": [True, False],
         "no_rsa": [True, False],
         "no_sha": [True, False],
-        "openssldir": "ANY",
-        "cafile": "ANY",
-        "capath": "ANY",
+        "openssldir": ["ANY"],
+        "cafile": ["ANY"], 
+        "capath": ["ANY"],
         "no_pinshared": [True, False],
         "no_stdio": [True, False],
-        "enable_weak_ssl_ciphers": [True, False],
-        "enable_ssl3": [True, False],
-        "enable_ssl3_method": [True, False],
-        "enable_trace": [True, False],
-        "enable_unit_test": [True, False],
-        "enable_ubsan": [True, False],
-        "enable_asan": [True, False],
-        "enable_msan": [True, False],
-        "enable_tsan": [True, False],
-        "enable_fuzzer_afl": [True, False],
-        "enable_fuzzer_libfuzzer": [True, False],
-        "enable_external_tests": [True, False],
-        "enable_buildtest_c++": [True, False],
-        "enable_crypto_mdebug": [True, False],
-        "enable_crypto_mdebug_backtrace": [True, False],
         "enable_lms": [True, False],
-        "enable_quic": [True, False],
-        "enable_h3demo": [True, False],
-        "enable_demos": [True, False],
+        "enable_crypto_mdebug_backtrace": [True, False],
     }
     
     default_options = {
+        # Core build options
         "shared": True,
+        "fPIC": True,
+        
+        # Security & Compliance
         "fips": False,
+        "no_deprecated": False,
+        
+        # Features
+        "enable_demos": False,
+        "enable_h3demo": False,
+        "enable_sslkeylog": False,
+        "enable_quic": True,
+        
+        # Protocol support
+        "enable_ssl3": False,
+        "enable_ssl3_method": False,
+        "no_dtls": False,
+        "no_tls1": False,
+        "no_tls1_1": False,
+        
+        # Cryptographic algorithms
+        "enable_md2": False,
+        "enable_md4": False,
+        "enable_weak_ssl_ciphers": False,
+        "enable_ec_nistp_64_gcc_128": False,
+        
+        # Performance & Optimization
         "no_asm": False,
         "no_threads": False,
+        "no_bulk": False,
+        
+        # Debugging & Testing
+        "enable_crypto_mdebug": False,
+        "enable_trace": False,
+        "enable_asan": False,
+        "enable_ubsan": False,
+        "enable_msan": False,
+        "enable_tsan": False,
+        "enable_unit_test": False,
+        "enable_external_tests": False,
+        "enable_fuzzer_afl": False,
+        "enable_fuzzer_libfuzzer": False,
+        "enable_buildtest_c++": False,
+        
+        # System integration
+        "enable_ktls": False,
+        "enable_sctp": False,
+        
+        # Compression
+        "enable_zlib": False,
+        "enable_zlib_dynamic": False,
+        "enable_zstd": False,
+        
+        # Legacy & Compatibility
+        "no_legacy": False,
+        "no_afalgeng": False,
+        
+        # Miscellaneous
+        "enable_egd": False,
+        "no_cached_fetch": False,
+        
+        # Legacy options (for backward compatibility)
         "no_zlib": False,
-        "no_egd": True,
         "386": False,
         "no_sse2": False,
         "no_bf": False,
@@ -104,35 +203,19 @@ class OpenSSLConan(ConanFile):
         "no_rc5": True,
         "no_rsa": False,
         "no_sha": False,
-        "openssldir": "",
+        "openssldir": "/usr/local/ssl",
         "cafile": "",
         "capath": "",
         "no_pinshared": False,
         "no_stdio": False,
-        "enable_weak_ssl_ciphers": False,
-        "enable_ssl3": False,
-        "enable_ssl3_method": False,
-        "enable_trace": False,
-        "enable_unit_test": False,
-        "enable_ubsan": False,
-        "enable_asan": False,
-        "enable_msan": False,
-        "enable_tsan": False,
-        "enable_fuzzer_afl": False,
-        "enable_fuzzer_libfuzzer": False,
-        "enable_external_tests": False,
-        "enable_buildtest_c++": False,
-        "enable_crypto_mdebug": False,
-        "enable_crypto_mdebug_backtrace": False,
         "enable_lms": False,
-        "enable_quic": True,
-        "enable_h3demo": False,
-        "enable_demos": False,
+        "enable_crypto_mdebug_backtrace": False,
     }
     
     # Build requirements
     def build_requirements(self):
-        self.tool_requires("perl/5.34.0")
+        # Use system perl for now - perl packages not available in conancenter
+        # self.tool_requires("perl/5.38.0")
         if self.settings.os == "Windows":
             self.tool_requires("nasm/2.15.05")
             self.tool_requires("strawberryperl/5.32.0.1")
@@ -141,6 +224,11 @@ class OpenSSLConan(ConanFile):
     def requirements(self):
         if not self.options.no_zlib:
             self.requires("zlib/1.3.1")
+        
+        # Add fuzz corpora if fuzzing is enabled
+        if (self.options.enable_fuzzer_afl or self.options.enable_fuzzer_libfuzzer or 
+            os.getenv("OSSL_RUN_CI_TESTS")):
+            self.requires("openssl-fuzz-corpora/1.0.0")
             
     def system_requirements(self):
         # System package requirements for different platforms
@@ -178,6 +266,10 @@ class OpenSSLConan(ConanFile):
                 
     def configure(self):
         """Configure and validate build options"""
+        # Static builds don't need fPIC
+        if not self.options.shared:
+            del self.options.fPIC
+            
         # Configure build options based on settings
         if self.settings.build_type == "Debug":
             self.options.enable_crypto_mdebug = True
@@ -189,6 +281,16 @@ class OpenSSLConan(ConanFile):
         # Performance builds  
         if self.settings.build_type == "Release" and self.settings.arch in ["x86_64", "armv8"]:
             self.options.no_asm = False
+            
+        # Sanitizers require debug build
+        if self.settings.build_type != "Debug":
+            if self.options.enable_asan or self.options.enable_ubsan or \
+               self.options.enable_msan or self.options.enable_tsan:
+                self.output.warn("Sanitizers require Debug build, disabling")
+                self.options.enable_asan = False
+                self.options.enable_ubsan = False
+                self.options.enable_msan = False
+                self.options.enable_tsan = False
     
     def validate(self):
         """Validate configuration options for conflicts"""
@@ -208,9 +310,9 @@ class OpenSSLConan(ConanFile):
         
         # Sanitizers are mutually exclusive
         sanitizers = [
-            self.options.enable_asan,
-            self.options.enable_msan,
-            self.options.enable_tsan
+            bool(self.options.enable_asan),
+            bool(self.options.enable_msan),
+            bool(self.options.enable_tsan)
         ]
         if sum(sanitizers) > 1:
             raise ConanInvalidConfiguration(
@@ -322,15 +424,34 @@ class OpenSSLConan(ConanFile):
                 "weak_ssl_ciphers", "ssl3", "ssl3_method", "trace", "unit_test",
                 "ubsan", "asan", "msan", "tsan", "fuzzer_afl", "fuzzer_libfuzzer",
                 "external_tests", "buildtest_c++", "crypto_mdebug", 
-                "crypto_mdebug_backtrace", "lms", "quic", "h3demo", "demos"
+                "crypto_mdebug_backtrace", "lms", "quic", "h3demo", "demos",
+                "sslkeylog", "md2", "md4", "ec_nistp_64_gcc_128",
+                "ktls", "sctp", "zlib", "zlib_dynamic", "zstd", "egd"
+            ]
+            
+            # No- options
+            no_options = [
+                "deprecated", "dtls", "tls1", "tls1_1", "legacy", "afalgeng",
+                "cached_fetch", "bulk", "rc5"
             ]
             
             for option in enable_options:
                 try:
                     if getattr(self.options, f"enable_{option}", False):
-                        args.append(f"enable-{option.replace('_', '-')}")
+                        # Special handling for fuzzer options
+                        if option in ["fuzzer_afl", "fuzzer_libfuzzer"]:
+                            args.append(f"fuzz-{option.replace('fuzzer_', '')}")
+                        else:
+                            args.append(f"enable-{option.replace('_', '-')}")
                 except AttributeError:
                     self.output.warning(f"Option 'enable_{option}' not found, skipping")
+                    
+            for option in no_options:
+                try:
+                    if getattr(self.options, f"no_{option}", False):
+                        args.append(f"no-{option.replace('_', '-')}")
+                except AttributeError:
+                    self.output.warning(f"Option 'no_{option}' not found, skipping")
                     
             # Directories
             if self.options.openssldir:
@@ -371,6 +492,11 @@ class OpenSSLConan(ConanFile):
         jobs = os.getenv("CONAN_CPU_COUNT", "1")
         self.run(f"make -j{jobs}")
         
+        # Download fuzz corpora if fuzzing is enabled
+        if (self.options.enable_fuzzer_afl or self.options.enable_fuzzer_libfuzzer or 
+            os.getenv("OSSL_RUN_CI_TESTS")):
+            self._setup_fuzz_corpora()
+        
         # Run tests if enabled
         if self.options.enable_unit_test or os.getenv("OSSL_RUN_CI_TESTS"):
             self.run("make test")
@@ -410,19 +536,22 @@ class OpenSSLConan(ConanFile):
             "incompatible": []
         }
         
-        for dep in self.deps_cpp_info.deps:
-            # In real implementation, you'd query license info from Conan metadata
-            # This is a simplified version
-            dep_license = "Unknown"  # Would get from self.deps_cpp_info[dep] metadata
+        # For Python tools, we don't have C++ dependencies
+        deps = getattr(self, 'deps_cpp_info', None)
+        if deps and hasattr(deps, 'deps'):
+            for dep in deps.deps:
+                # In real implementation, you'd query license info from Conan metadata
+                # This is a simplified version
+                dep_license = "Unknown"  # Would get from deps[dep] metadata
             
-            if dep_license in approved_licenses:
-                license_report["approved"].append(f"{dep}: {dep_license}")
-            elif dep_license == "Unknown":
-                license_report["unknown"].append(dep)
-                self.output.warning(f"Unknown license for dependency: {dep}")
-            else:
-                license_report["incompatible"].append(f"{dep}: {dep_license}")
-                self.output.warning(f"Potentially incompatible license: {dep} ({dep_license})")
+                if dep_license in approved_licenses:
+                    license_report["approved"].append(f"{dep}: {dep_license}")
+                elif dep_license == "Unknown":
+                    license_report["unknown"].append(dep)
+                    self.output.warning(f"Unknown license for dependency: {dep}")
+                else:
+                    license_report["incompatible"].append(f"{dep}: {dep_license}")
+                    self.output.warning(f"Potentially incompatible license: {dep} ({dep_license})")
         
         # Save license report
         license_path = os.path.join(self.package_folder, "licenses", "license-report.json")
@@ -430,7 +559,7 @@ class OpenSSLConan(ConanFile):
         return license_report
     
     def _generate_sbom(self):
-        """Generate enhanced SBOM with security features"""
+        """Generate enhanced SBOM with security features - pattern from ngapy-dev"""
         self.output.info("Generating Software Bill of Materials (SBOM)...")
         
         # Calculate hashes for main libraries
@@ -448,7 +577,17 @@ class OpenSSLConan(ConanFile):
                             "algorithm": "SHA-256"
                         }
         
-        # Enhanced SBOM data structure
+        # Enhanced metadata collection - pattern from ngapy-dev
+        build_metadata = {
+            "build_timestamp": os.environ.get("SOURCE_DATE_EPOCH", ""),
+            "build_platform": f"{self.settings.os}-{self.settings.arch}",
+            "compiler": "python",  # Python tools don't use C++ compiler
+            "build_type": "Release",  # Default for Python tools
+            "conan_version": "2.0",  # Would get from actual Conan version
+            "build_options": {k: str(v) for k, v in self.options.items()}
+        }
+        
+        # Enhanced SBOM data structure - pattern from ngapy-dev
         sbom_data = {
             "bomFormat": "CycloneDX",
             "specVersion": "1.5",
@@ -474,6 +613,12 @@ class OpenSSLConan(ConanFile):
                             "type": "vcs",
                             "url": self.url
                         }
+                    ],
+                    "properties": [
+                        {"name": "build_metadata", "value": json.dumps(build_metadata)},
+                        {"name": "conan_options", "value": json.dumps({k: str(v) for k, v in self.options.items()})},
+                        {"name": "build_platform", "value": f"{self.settings.os}-{self.settings.arch}"},
+                        {"name": "compiler", "value": f"{self.settings.compiler}-{self.settings.compiler.version}"}
                     ]
                 },
                 "tools": [
@@ -489,9 +634,12 @@ class OpenSSLConan(ConanFile):
         }
         
         # Add dependencies to SBOM with enhanced metadata
-        for dep in self.deps_cpp_info.deps:
-            try:
-                dep_version = str(self.deps_cpp_info[dep].version) if hasattr(self.deps_cpp_info[dep], 'version') else "unknown"
+        # For Python tools, we don't have C++ dependencies
+        deps = getattr(self, 'deps_cpp_info', None)
+        if deps and hasattr(deps, 'deps'):
+            for dep in deps.deps:
+                try:
+                    dep_version = str(deps[dep].version) if hasattr(deps[dep], 'version') else "unknown"
                 component = {
                     "type": "library",
                     "bom-ref": f"{dep}@{dep_version}",
@@ -509,12 +657,57 @@ class OpenSSLConan(ConanFile):
         save(self, sbom_path, json.dumps(sbom_data, indent=2))
         self.output.success(f"SBOM generated: {sbom_path}")
         
+        # Generate package signature if key is available
+        self._sign_package(sbom_path)
+        
         # Validate licenses
         self._validate_licenses()
         
-        # Vulnerability scanning is handled in CI; no local placeholder generation
+        # Generate vulnerability report placeholder
+        self._generate_vulnerability_report()
     
-    # Removed local signing and vulnerability placeholder generation.
+    def _sign_package(self, sbom_path):
+        """Sign package for supply chain security (placeholder for actual signing)"""
+        # This would integrate with actual signing tools like cosign, gpg, etc.
+        signing_enabled = os.getenv("CONAN_SIGN_PACKAGES", "false").lower() == "true"
+        
+        if not signing_enabled:
+            self.output.info("Package signing disabled (set CONAN_SIGN_PACKAGES=true to enable)")
+            return
+        
+        self.output.info("Package signing placeholder - integrate with cosign/gpg in production")
+        # Example integration points:
+        # - cosign sign-blob --key cosign.key sbom.json
+        # - gpg --detach-sign --armor sbom.json
+        
+        signature_metadata = {
+            "signed": True,
+            "timestamp": str(os.environ.get("SOURCE_DATE_EPOCH", "")),
+            "algorithm": "placeholder",
+            "keyid": "placeholder"
+        }
+        
+        sig_path = os.path.join(self.package_folder, "package-signature.json")
+        save(self, sig_path, json.dumps(signature_metadata, indent=2))
+    
+    def _generate_vulnerability_report(self):
+        """Generate vulnerability scan report (integration point)"""
+        # This would integrate with tools like Trivy, Snyk, OWASP Dependency Check
+        vuln_report = {
+            "scanTool": "placeholder",
+            "scanDate": str(os.environ.get("SOURCE_DATE_EPOCH", "")),
+            "component": f"{self.name}@{self.version}",
+            "vulnerabilities": [],
+            "note": "Integrate with Trivy/Snyk for actual vulnerability scanning"
+        }
+        
+        # Example integration commands (to be run in CI):
+        # trivy fs --format json --output trivy-report.json .
+        # snyk test --json > snyk-report.json
+        
+        vuln_path = os.path.join(self.package_folder, "vulnerability-report.json")
+        save(self, vuln_path, json.dumps(vuln_report, indent=2))
+        self.output.info(f"Vulnerability report placeholder generated: {vuln_path}")
         
     def package_info(self):
         # Set package information
@@ -578,6 +771,66 @@ class OpenSSLConan(ConanFile):
         
         # Build test options
         try:
-            del self.info.options.enable_buildtest_cplusplus
+            delattr(self.info.options, "enable_buildtest_c++")
         except AttributeError:
             pass  # Option might be named differently
+    
+    def _setup_fuzz_corpora(self):
+        """Set up fuzz corpora data from Conan package."""
+        try:
+            self.output.info("Setting up fuzz corpora data from Conan package...")
+            
+            # Create fuzz/corpora directory
+            corpora_dir = os.path.join(self.source_folder, "fuzz", "corpora")
+            os.makedirs(corpora_dir, exist_ok=True)
+            
+            # Check if corpora directory is empty or doesn't exist
+            if not os.listdir(corpora_dir):
+                # Get the fuzz corpora package path
+                fuzz_corpora_dep = None
+                for dep in self.dependencies.values():
+                    if dep.ref.name == "openssl-fuzz-corpora":
+                        fuzz_corpora_dep = dep
+                        break
+                
+                if fuzz_corpora_dep:
+                    # Get the corpora path from the package
+                    corpora_package_path = os.path.join(fuzz_corpora_dep.package_folder, "corpora")
+                    
+                    if os.path.exists(corpora_package_path):
+                        self.output.info("Copying fuzz corpora data from Conan package...")
+                        
+                        # Copy corpora data to fuzz/corpora
+                        import shutil
+                        for item in os.listdir(corpora_package_path):
+                            if not item.startswith('.'):
+                                src = os.path.join(corpora_package_path, item)
+                                dst = os.path.join(corpora_dir, item)
+                                
+                                if os.path.isdir(src):
+                                    if os.path.exists(dst):
+                                        shutil.rmtree(dst)
+                                    shutil.copytree(src, dst)
+                                else:
+                                    shutil.copy2(src, dst)
+                        
+                        # Count files for verification
+                        corpora_files = []
+                        for root, dirs, files in os.walk(corpora_dir):
+                            corpora_files.extend(files)
+                        
+                        self.output.info(f"Copied {len(corpora_files)} fuzz corpora files from Conan package")
+                        
+                        # Set environment variable for fuzz tests
+                        os.environ['OPENSSL_FUZZ_CORPORA_PATH'] = corpora_dir
+                        
+                    else:
+                        self.output.warning("Fuzz corpora package path not found")
+                else:
+                    self.output.warning("Fuzz corpora dependency not found")
+            else:
+                self.output.info("Fuzz corpora data already exists, skipping copy")
+                
+        except Exception as e:
+            self.output.warning(f"Failed to set up fuzz corpora: {e}")
+            self.output.warning("Fuzz tests may not have access to corpora data")

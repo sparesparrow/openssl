@@ -24,7 +24,6 @@ jobs:
   # Detect what changed to avoid unnecessary rebuilds
   detect-changes:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
     outputs:
       source-changed: ${{ steps.changes.outputs.source }}
       docs-only: ${{ steps.changes.outputs.docs-only }}
@@ -56,7 +55,6 @@ jobs:
   # Quick documentation checks (always run, fast)
   check-docs:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - name: config
@@ -73,9 +71,8 @@ jobs:
   # Core build - optimized with caching
   basic-gcc:
     needs: detect-changes
-    if: success() && needs.detect-changes.outputs.source-changed == 'true'
+    if: needs.detect-changes.outputs.source-changed == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: checkout fuzz/corpora submodule
@@ -88,9 +85,9 @@ jobs:
           path: |
             .
             !.git
-          key: build-gcc-${{ hashFiles('**/*.c', '**/*.h', 'Configure', 'VERSION.dat') }}-${{ github.sha }}
+          key: build-gcc-${{ hashFiles('Configure', 'VERSION.dat') }}-${{ github.sha }}
           restore-keys: |
-            build-gcc-${{ hashFiles('**/*.c', '**/*.h', 'Configure', 'VERSION.dat') }}-
+            build-gcc-${{ hashFiles('Configure', 'VERSION.dat') }}-
             build-gcc-
             
       - name: localegen
@@ -120,9 +117,8 @@ jobs:
   # Core build - Clang
   basic-clang:
     needs: detect-changes
-    if: success() && needs.detect-changes.outputs.source-changed == 'true'
+    if: needs.detect-changes.outputs.source-changed == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: checkout fuzz/corpora submodule
@@ -135,9 +131,9 @@ jobs:
           path: |
             .
             !.git
-          key: build-clang-${{ hashFiles('**/*.c', '**/*.h', 'Configure', 'VERSION.dat') }}-${{ github.sha }}
+          key: build-clang-${{ hashFiles('Configure', 'VERSION.dat') }}-${{ github.sha }}
           restore-keys: |
-            build-clang-${{ hashFiles('**/*.c', '**/*.h', 'Configure', 'VERSION.dat') }}-
+            build-clang-${{ hashFiles('Configure', 'VERSION.dat') }}-
             build-clang-
             
       - name: config
@@ -160,9 +156,8 @@ jobs:
   # Sanitizer builds - only on source changes
   sanitizer-asan-ubsan:
     needs: detect-changes
-    if: success() && needs.detect-changes.outputs.source-changed == 'true'
+    if: needs.detect-changes.outputs.source-changed == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: checkout fuzz/corpora submodule

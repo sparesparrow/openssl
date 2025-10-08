@@ -19,7 +19,14 @@ export OSSL_CI_ARTIFACTS_PATH="$(cd "$OSSL_CI_ARTIFACTS_PATH"; pwd)"
 
 # Run the tests. This might fail, but we need to capture artifacts anyway.
 set +e
-make test HARNESS_JOBS=${HARNESS_JOBS:-4} "$@"
+# Use timeout to prevent hanging tests
+timeout 3600 make test HARNESS_JOBS=${HARNESS_JOBS:-2} "$@" || {
+    RESULT=$?
+    if [ $RESULT -eq 124 ]; then
+        echo "Test execution timed out after 60 minutes"
+    fi
+    exit $RESULT
+}
 RESULT=$?
 set -e
 

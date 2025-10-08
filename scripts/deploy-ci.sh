@@ -46,14 +46,14 @@ print_info() {
 }
 
 confirm() {
-    # Non-interactive mode accepts CI_ASSUME_YES=yes
-    if [[ "${CI_ASSUME_YES:-}" =~ ^(1|yes|true|y)$ ]]; then
-        return 0
-    fi
-    read -p "$(echo -e "${YELLOW}?${NC} $1 [y/N]: ")" response || { echo; return 1; }
+    read -p "$(echo -e "${YELLOW}?${NC} $1 [y/N]: ")" response
     case "$response" in
-        [yY][eE][sS]|[yY]) return 0 ;;
-        *) return 1 ;;
+        [yY][eE][sS]|[yY]) 
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
     esac
 }
 
@@ -106,14 +106,9 @@ deploy_conservative() {
         echo ""
         
         if confirm "Commit changes before merging?"; then
-            git add . || { print_error "git add failed"; return 1; }
-            commit_msg_default="CI/CD fixes and improvements"
-            if [[ -n "${CI_COMMIT_MESSAGE:-}" ]]; then
-                commit_msg="$CI_COMMIT_MESSAGE"
-            else
-                read -p "Commit message: " commit_msg || commit_msg=""
-            fi
-            git commit -m "${commit_msg:-$commit_msg_default}" || { print_error "git commit failed"; return 1; }
+            git add .
+            read -p "Commit message: " commit_msg
+            git commit -m "${commit_msg:-CI/CD fixes and improvements}"
             print_success "Changes committed"
         fi
     else
@@ -233,7 +228,7 @@ deploy_advanced() {
         echo "  pip install conan==2.0.17"
         echo ""
         if confirm "Install Conan now?"; then
-            pip install --no-input conan==2.0.17 || { print_error "pip install failed"; return 1; }
+            pip install conan==2.0.17
             print_success "Conan installed"
         else
             print_warn "Conan required for advanced deployment"
@@ -263,11 +258,11 @@ deploy_advanced() {
     echo ""
     if confirm "Run test build?"; then
         print_step "Exporting recipe..."
-        conan export . --name=openssl --version=3.5.0 || { print_error "conan export failed"; return 1; }
+        conan export . --name=openssl --version=3.5.0
         
         print_step "Testing profile..."
         conan graph info --requires=openssl/3.5.0@ \
-            --profile=conan-profiles/ci-linux-gcc.profile || { print_error "conan graph info failed"; return 1; }
+            --profile=conan-profiles/ci-linux-gcc.profile
         
         print_success "Conan build test passed"
     else

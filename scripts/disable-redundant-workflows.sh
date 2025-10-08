@@ -95,12 +95,7 @@ echo "  3. Show manual instructions"
 echo "  4. Exit"
 echo ""
 
-# Support non-interactive CI mode with DISABLE_OPTION
-if [[ -n "${DISABLE_OPTION:-}" ]]; then
-    option="$DISABLE_OPTION"
-else
-    read -p "Choose option [1-4]: " option || option=4
-fi
+read -p "Choose option [1-4]: " option
 
 case $option in
     1)
