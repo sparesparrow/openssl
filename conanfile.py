@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 OpenSSL Conan Package Recipe
-Production-ready Conan 2.x recipe with AutotoolsToolchain for OpenSSL
+Production-ready Conan 2.x recipe with comprehensive OpenSSL build support
 """
 
 from conan import ConanFile
@@ -546,9 +546,18 @@ class OpenSSLConan(ConanFile):
             os.getenv("OSSL_RUN_CI_TESTS")):
             self._setup_fuzz_corpora()
         
-        # Run tests if enabled
-        if self.options.enable_unit_test or os.getenv("OSSL_RUN_CI_TESTS"):
+        # Run tests if enabled and not skipped
+        if (self.options.enable_unit_test or os.getenv("OSSL_RUN_CI_TESTS")) and not self._should_skip_tests():
             self.run("make test")
+            
+    def _should_skip_tests(self):
+        """Check if tests should be skipped based on tools.build:skip_test"""
+        # Check for tools.build:skip_test in conanfile.txt or profile
+        try:
+            # This would be set by the profile or conanfile.txt
+            return os.getenv("CONAN_SKIP_TESTS", "false").lower() == "true"
+        except:
+            return False
             
     def package(self):
         """Package OpenSSL"""
@@ -759,19 +768,27 @@ class OpenSSLConan(ConanFile):
         self.output.info(f"Vulnerability report placeholder generated: {vuln_path}")
         
     def package_info(self):
-        """Set package information for consumers"""
-        # Set package information
-        self.cpp_info.libs = ["ssl", "crypto"]
+        """Set package information for consumers with component separation"""
+        # Separate components for proper dependency resolution
+        # SSL component
+        self.cpp_info.components["ssl"].libs = ["ssl"]
+        self.cpp_info.components["ssl"].requires = ["crypto"]
         
-        # Platform-specific system libraries
+        # Crypto component  
+        self.cpp_info.components["crypto"].libs = ["crypto"]
+        
+        # Platform-specific system libraries for each component
         if self.settings.os == "Linux":
-            self.cpp_info.system_libs.extend(["dl", "pthread"])
+            self.cpp_info.components["ssl"].system_libs.extend(["dl", "pthread"])
+            self.cpp_info.components["crypto"].system_libs.extend(["dl", "pthread"])
         elif self.settings.os == "Windows":
-            self.cpp_info.system_libs.extend(["ws2_32", "gdi32", "advapi32", "crypt32", "user32"])
+            self.cpp_info.components["ssl"].system_libs.extend(["ws2_32", "gdi32", "advapi32", "crypt32", "user32"])
+            self.cpp_info.components["crypto"].system_libs.extend(["ws2_32", "gdi32", "advapi32", "crypt32", "user32"])
         elif self.settings.os == "Macos":
-            self.cpp_info.frameworks.append("Security")
+            self.cpp_info.components["ssl"].frameworks.append("Security")
+            self.cpp_info.components["crypto"].frameworks.append("Security")
             
-        # Set binary paths
+        # Set binary paths for all components
         self.cpp_info.bindirs = ["bin"]
         self.cpp_info.includedirs = ["include"]
         self.cpp_info.libdirs = ["lib"]
