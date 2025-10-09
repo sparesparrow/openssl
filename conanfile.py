@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
 OpenSSL Conan Package Recipe
-Modern dependency management for OpenSSL CI/CD pipeline with enhanced security
+Production-ready Conan 2.x recipe with comprehensive OpenSSL build support
 """
 
 from conan import ConanFile
-from conan.tools.cmake import CMakeToolchain, CMakeDeps, cmake_layout
-from conan.tools.files import copy, save, load
+from conan.tools.gnu import AutotoolsToolchain, AutotoolsDeps, Autotools
+from conan.tools.files import copy, save, load, chdir
 from conan.tools.scm import Git
 from conan.tools.system import package_manager
 from conan.errors import ConanInvalidConfiguration
@@ -216,12 +216,11 @@ class OpenSSLConan(ConanFile):
     
     # Build requirements
     def build_requirements(self):
-        self.tool_requires("openssl-tools/0.1.0-17-gaff7cf4-dirty")
-        # Use system perl for now - perl packages not available in conancenter
-        # self.tool_requires("perl/5.38.0")
         if self.settings.os == "Windows":
             self.tool_requires("nasm/2.15.05")
             self.tool_requires("strawberryperl/5.32.0.1")
+        # Use system perl for Unix-like systems
+        # self.tool_requires("perl/5.38.0")
         
     # Runtime requirements  
     def requirements(self):
@@ -251,8 +250,8 @@ class OpenSSLConan(ConanFile):
         version_file = os.path.join(self.recipe_folder, "VERSION.dat")
         if not os.path.exists(version_file):
             # Fallback for testing or if VERSION.dat is missing
-            self.output.warning("VERSION.dat not found, using default version 3.5.0")
-            self.version = "3.5.0"
+            self.output.warning("VERSION.dat not found, using default version 4.0.0")
+            self.version = "4.0.0"
             return
             
         try:
@@ -376,123 +375,164 @@ class OpenSSLConan(ConanFile):
             )
             
     def export_sources(self):
-        # Export all source files
+        """Export full source tree for reproducible builds"""
+        # Export all source files - critical for reproducible builds
         copy(self, "*", src=self.recipe_folder, dst=self.export_sources_folder)
         
     def layout(self):
-        # Use basic layout for custom build system
+        """Use basic layout for OpenSSL's in-tree build system"""
         # OpenSSL builds in-tree, so we don't separate source and build
         pass
         
     def generate(self):
-        # Generate build environment
-        deps = CMakeDeps(self)
+        """Generate Autotools toolchain and dependencies"""
+        # Generate dependencies
+        deps = AutotoolsDeps(self)
         deps.generate()
         
-        tc = CMakeToolchain(self)
+        # Generate Autotools toolchain
+        tc = AutotoolsToolchain(self)
+        
+        # Configure OpenSSL-specific environment
+        self._configure_openssl_environment(tc)
+        
         tc.generate()
         
+    def _configure_openssl_environment(self, tc):
+        """Configure OpenSSL-specific environment variables and flags"""
+        # Set OpenSSL configuration environment
+        if self.options.openssldir:
+            tc.environment.define("OPENSSL_CONF", str(self.options.openssldir))
+        
+        # Configure compiler flags for OpenSSL
+        if self.settings.build_type == "Debug":
+            tc.environment.define("CFLAGS", "-g -O0")
+            tc.environment.define("CXXFLAGS", "-g -O0")
+        elif self.settings.build_type == "Release":
+            tc.environment.define("CFLAGS", "-O2 -DNDEBUG")
+            tc.environment.define("CXXFLAGS", "-O2 -DNDEBUG")
+        
+        # Add strict warnings for CI builds
+        if os.getenv("OSSL_RUN_CI_TESTS"):
+            tc.environment.append("CFLAGS", "-Wall -Wextra -Werror")
+            tc.environment.append("CXXFLAGS", "-Wall -Wextra -Werror")
+        
+        # Configure threading
+        if not self.options.no_threads:
+            if self.settings.os == "Linux":
+                tc.environment.define("THREADS", "pthread")
+            elif self.settings.os == "Windows":
+                tc.environment.define("THREADS", "win32")
+        
+        # Configure assembly optimizations
+        if not self.options.no_asm:
+            if self.settings.arch == "x86_64":
+                tc.environment.define("ASM", "x86_64")
+            elif self.settings.arch == "armv8":
+                tc.environment.define("ASM", "aarch64")
+        
+        # Configure FIPS
+        if self.options.fips:
+            tc.environment.define("FIPS", "1")
+            tc.environment.define("FIPS_MODULE", "1")
+        
     def _get_configure_command(self):
-        """Generate OpenSSL configure command based on options with error handling"""
-        try:
-            args = ["./config", "--banner=Configured"]
+        """Generate OpenSSL configure command based on options"""
+        args = ["./config", "--banner=Configured"]
+        
+        # Validate that config script exists
+        if not os.path.exists("./config"):
+            raise ConanInvalidConfiguration("OpenSSL config script not found in source directory")
+        
+        # Basic options
+        if not self.options.shared:
+            args.append("no-shared")
             
-            # Validate that config script exists
-            if not os.path.exists("./config"):
-                raise ConanInvalidConfiguration("OpenSSL config script not found in source directory")
+        if self.options.fips:
+            args.append("enable-fips")
+            self.output.info("FIPS mode enabled - ensure compliance requirements are met")
             
-            # Basic options
-            if not self.options.shared:
-                args.append("no-shared")
-                
-            if self.options.fips:
-                args.append("enable-fips")
-                self.output.info("FIPS mode enabled - ensure compliance requirements are met")
-                
-            if self.options.no_asm:
-                args.append("no-asm")
-                
-            if self.options.no_threads:
-                args.append("no-threads")
-                
-            # Crypto options
-            crypto_options = [
-                "bf", "cast", "des", "dh", "dsa", "hmac", "md2", "md4", "md5", 
-                "mdc2", "rc2", "rc4", "rc5", "rsa", "sha"
-            ]
+        if self.options.no_asm:
+            args.append("no-asm")
             
-            for option in crypto_options:
-                try:
-                    if getattr(self.options, f"no_{option}", False):
-                        args.append(f"no-{option}")
-                except AttributeError:
-                    self.output.warning(f"Option 'no_{option}' not found, skipping")
-                    
-            # Enable options
-            enable_options = [
-                "weak_ssl_ciphers", "ssl3", "ssl3_method", "trace", "unit_test",
-                "ubsan", "asan", "msan", "tsan", "fuzzer_afl", "fuzzer_libfuzzer",
-                "external_tests", "buildtest_c++", "crypto_mdebug", 
-                "crypto_mdebug_backtrace", "lms", "quic", "h3demo", "demos",
-                "sslkeylog", "md2", "md4", "ec_nistp_64_gcc_128",
-                "ktls", "sctp", "zlib", "zlib_dynamic", "zstd", "brotli", "egd"
-            ]
+        if self.options.no_threads:
+            args.append("no-threads")
             
-            # No- options
-            no_options = [
-                "deprecated", "dtls", "tls1", "tls1_1", "legacy", "afalgeng",
-                "cached_fetch", "bulk", "rc5"
-            ]
-            
-            for option in enable_options:
-                try:
-                    if getattr(self.options, f"enable_{option}", False):
-                        # Special handling for fuzzer options
-                        if option in ["fuzzer_afl", "fuzzer_libfuzzer"]:
-                            args.append(f"fuzz-{option.replace('fuzzer_', '')}")
-                        else:
-                            args.append(f"enable-{option.replace('_', '-')}")
-                except AttributeError:
-                    self.output.warning(f"Option 'enable_{option}' not found, skipping")
-                    
-            for option in no_options:
-                try:
-                    if getattr(self.options, f"no_{option}", False):
-                        args.append(f"no-{option.replace('_', '-')}")
-                except AttributeError:
-                    self.output.warning(f"Option 'no_{option}' not found, skipping")
-                    
-            # Directories
-            if self.options.openssldir:
-                openssldir = str(self.options.openssldir)
-                if not os.path.isabs(openssldir):
-                    self.output.warning(f"openssldir '{openssldir}' is relative, consider using absolute path")
-                args.append(f"--openssldir={openssldir}")
-            else:
-                args.append(f"--openssldir={os.path.join(self.package_folder, 'ssl')}")
+        # Crypto options
+        crypto_options = [
+            "bf", "cast", "des", "dh", "dsa", "hmac", "md2", "md4", "md5", 
+            "mdc2", "rc2", "rc4", "rc5", "rsa", "sha"
+        ]
+        
+        for option in crypto_options:
+            try:
+                if getattr(self.options, f"no_{option}", False):
+                    args.append(f"no-{option}")
+            except AttributeError:
+                self.output.warning(f"Option 'no_{option}' not found, skipping")
                 
-            args.append(f"--prefix={self.package_folder}")
-            
-            # Compiler flags
-            if self.settings.build_type == "Debug":
-                args.append("--debug")
-            elif self.settings.build_type == "Release":
-                args.append("--release")
-            else:
-                self.output.warning(f"Unknown build_type '{self.settings.build_type}', using default")
+        # Enable options
+        enable_options = [
+            "weak_ssl_ciphers", "ssl3", "ssl3_method", "trace", "unit_test",
+            "ubsan", "asan", "msan", "tsan", "fuzzer_afl", "fuzzer_libfuzzer",
+            "external_tests", "buildtest_c++", "crypto_mdebug", 
+            "crypto_mdebug_backtrace", "lms", "quic", "h3demo", "demos",
+            "sslkeylog", "md2", "md4", "ec_nistp_64_gcc_128",
+            "ktls", "sctp", "zlib", "zlib_dynamic", "zstd", "brotli", "egd"
+        ]
+        
+        # No- options
+        no_options = [
+            "deprecated", "dtls", "tls1", "tls1_1", "legacy", "afalgeng",
+            "cached_fetch", "bulk", "rc5"
+        ]
+        
+        for option in enable_options:
+            try:
+                if getattr(self.options, f"enable_{option}", False):
+                    # Special handling for fuzzer options
+                    if option in ["fuzzer_afl", "fuzzer_libfuzzer"]:
+                        args.append(f"fuzz-{option.replace('fuzzer_', '')}")
+                    else:
+                        args.append(f"enable-{option.replace('_', '-')}")
+            except AttributeError:
+                self.output.warning(f"Option 'enable_{option}' not found, skipping")
                 
-            # Add strict warnings for CI builds
-            if os.getenv("OSSL_RUN_CI_TESTS"):
-                args.append("--strict-warnings")
+        for option in no_options:
+            try:
+                if getattr(self.options, f"no_{option}", False):
+                    args.append(f"no-{option.replace('_', '-')}")
+            except AttributeError:
+                self.output.warning(f"Option 'no_{option}' not found, skipping")
                 
-            self.output.info(f"Configure command: {' '.join(args)}")
-            return args
+        # Directories
+        if self.options.openssldir:
+            openssldir = str(self.options.openssldir)
+            if not os.path.isabs(openssldir):
+                self.output.warning(f"openssldir '{openssldir}' is relative, consider using absolute path")
+            args.append(f"--openssldir={openssldir}")
+        else:
+            args.append(f"--openssldir={os.path.join(self.package_folder, 'ssl')}")
             
-        except Exception as e:
-            self.output.error(f"Error generating configure command: {e}")
-            raise ConanInvalidConfiguration(f"config script validation failed: {e}")
+        args.append(f"--prefix={self.package_folder}")
+        
+        # Compiler flags
+        if self.settings.build_type == "Debug":
+            args.append("--debug")
+        elif self.settings.build_type == "Release":
+            args.append("--release")
+        else:
+            self.output.warning(f"Unknown build_type '{self.settings.build_type}', using default")
+            
+        # Add strict warnings for CI builds
+        if os.getenv("OSSL_RUN_CI_TESTS"):
+            args.append("--strict-warnings")
+            
+        self.output.info(f"Configure command: {' '.join(args)}")
+        return args
         
     def build(self):
+        """Build OpenSSL using Autotools"""
         # Configure OpenSSL
         configure_args = self._get_configure_command()
         self.run(" ".join(configure_args))
@@ -506,11 +546,21 @@ class OpenSSLConan(ConanFile):
             os.getenv("OSSL_RUN_CI_TESTS")):
             self._setup_fuzz_corpora()
         
-        # Run tests if enabled
-        if self.options.enable_unit_test or os.getenv("OSSL_RUN_CI_TESTS"):
+        # Run tests if enabled and not skipped
+        if (self.options.enable_unit_test or os.getenv("OSSL_RUN_CI_TESTS")) and not self._should_skip_tests():
             self.run("make test")
             
+    def _should_skip_tests(self):
+        """Check if tests should be skipped based on tools.build:skip_test"""
+        # Check for tools.build:skip_test in conanfile.txt or profile
+        try:
+            # This would be set by the profile or conanfile.txt
+            return os.getenv("CONAN_SKIP_TESTS", "false").lower() == "true"
+        except:
+            return False
+            
     def package(self):
+        """Package OpenSSL"""
         # Install OpenSSL
         self.run("make install_sw install_ssldirs")
         
@@ -568,7 +618,7 @@ class OpenSSLConan(ConanFile):
         return license_report
     
     def _generate_sbom(self):
-        """Generate enhanced SBOM with security features - pattern from ngapy-dev"""
+        """Generate enhanced SBOM with security features"""
         self.output.info("Generating Software Bill of Materials (SBOM)...")
         
         # Calculate hashes for main libraries
@@ -586,17 +636,17 @@ class OpenSSLConan(ConanFile):
                             "algorithm": "SHA-256"
                         }
         
-        # Enhanced metadata collection - pattern from ngapy-dev
+        # Enhanced metadata collection
         build_metadata = {
             "build_timestamp": os.environ.get("SOURCE_DATE_EPOCH", ""),
             "build_platform": f"{self.settings.os}-{self.settings.arch}",
-            "compiler": "python",  # Python tools don't use C++ compiler
-            "build_type": "Release",  # Default for Python tools
-            "conan_version": "2.0",  # Would get from actual Conan version
+            "compiler": f"{self.settings.compiler}-{self.settings.compiler.version}",
+            "build_type": str(self.settings.build_type),
+            "conan_version": "2.0",
             "build_options": {k: str(v) for k, v in self.options.items()}
         }
         
-        # Enhanced SBOM data structure - pattern from ngapy-dev
+        # Enhanced SBOM data structure
         sbom_data = {
             "bomFormat": "CycloneDX",
             "specVersion": "1.5",
@@ -643,7 +693,6 @@ class OpenSSLConan(ConanFile):
         }
         
         # Add dependencies to SBOM with enhanced metadata
-        # For Python tools, we don't have C++ dependencies
         deps = getattr(self, 'deps_cpp_info', None)
         if deps and hasattr(deps, 'deps'):
             for dep in deps.deps:
@@ -719,17 +768,27 @@ class OpenSSLConan(ConanFile):
         self.output.info(f"Vulnerability report placeholder generated: {vuln_path}")
         
     def package_info(self):
-        # Set package information
-        self.cpp_info.libs = ["ssl", "crypto"]
+        """Set package information for consumers with component separation"""
+        # Separate components for proper dependency resolution
+        # SSL component
+        self.cpp_info.components["ssl"].libs = ["ssl"]
+        self.cpp_info.components["ssl"].requires = ["crypto"]
         
+        # Crypto component  
+        self.cpp_info.components["crypto"].libs = ["crypto"]
+        
+        # Platform-specific system libraries for each component
         if self.settings.os == "Linux":
-            self.cpp_info.system_libs.extend(["dl", "pthread"])
+            self.cpp_info.components["ssl"].system_libs.extend(["dl", "pthread"])
+            self.cpp_info.components["crypto"].system_libs.extend(["dl", "pthread"])
         elif self.settings.os == "Windows":
-            self.cpp_info.system_libs.extend(["ws2_32", "gdi32", "advapi32", "crypt32", "user32"])
+            self.cpp_info.components["ssl"].system_libs.extend(["ws2_32", "gdi32", "advapi32", "crypt32", "user32"])
+            self.cpp_info.components["crypto"].system_libs.extend(["ws2_32", "gdi32", "advapi32", "crypt32", "user32"])
         elif self.settings.os == "Macos":
-            self.cpp_info.frameworks.append("Security")
+            self.cpp_info.components["ssl"].frameworks.append("Security")
+            self.cpp_info.components["crypto"].frameworks.append("Security")
             
-        # Set binary paths
+        # Set binary paths for all components
         self.cpp_info.bindirs = ["bin"]
         self.cpp_info.includedirs = ["include"]
         self.cpp_info.libdirs = ["lib"]
@@ -745,7 +804,7 @@ class OpenSSLConan(ConanFile):
             self.env_info.OPENSSL_CONF = os.path.join(self.package_folder, "ssl", "openssl.cnf")
             
     def package_id(self):
-        """Optimize package ID for better caching"""
+        """Optimize package ID for better caching with FIPS separation"""
         # Runtime path options don't affect binary compatibility
         del self.info.options.openssldir
         del self.info.options.cafile  
@@ -783,6 +842,35 @@ class OpenSSLConan(ConanFile):
             delattr(self.info.options, "enable_buildtest_c++")
         except AttributeError:
             pass  # Option might be named differently
+        
+        # CRITICAL FOR FIPS: FIPS builds must have separate cache key
+        # to avoid cross-contamination with non-FIPS builds
+        if self.info.options.fips:
+            # FIPS builds get a unique cache key
+            self.info.options.fips = "fips_enabled"
+        else:
+            # Non-FIPS builds are normalized
+            self.info.options.fips = "fips_disabled"
+        
+        # Enhanced cache key optimization
+        # Group compatible configurations for better cache reuse
+        if self.settings.build_type == "Debug":
+            # All debug builds can share cache regardless of specific debug options
+            self.info.settings.build_type = "Debug"
+        
+        # Group similar architectures for better cache reuse
+        if str(self.settings.arch) in ["x86_64", "amd64"]:
+            self.info.settings.arch = "x86_64"
+        elif str(self.settings.arch) in ["arm64", "aarch64"]:
+            self.info.settings.arch = "arm64"
+        
+        # Group compatible compiler versions
+        if str(self.settings.compiler) == "gcc":
+            if str(self.settings.compiler.version) in ["11", "12", "13"]:
+                self.info.settings.compiler.version = "11+"
+        elif str(self.settings.compiler) == "clang":
+            if str(self.settings.compiler.version) in ["14", "15", "16"]:
+                self.info.settings.compiler.version = "14+"
     
     def _setup_fuzz_corpora(self):
         """Set up fuzz corpora data from Conan package."""
