@@ -1,0 +1,211 @@
+name: Basic Validation
+
+on:
+  pull_request:
+    paths:
+      - '*.py'
+      - '*.yml'
+      - '*.yaml'
+      - 'conanfile.py'
+      - 'VERSION.dat'
+      - '.github/workflows/**'
+  push:
+    branches: [main, master]
+    paths:
+      - '*.py'
+      - '*.yml'
+      - '*.yaml'
+      - 'conanfile.py'
+      - 'VERSION.dat'
+      - '.github/workflows/**'
+
+jobs:
+  syntax-validation:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          pip install conan pyyaml
+      
+      - name: Validate conanfile.py syntax
+        run: |
+          python -m py_compile conanfile.py
+          echo "✅ conanfile.py syntax is valid"
+      
+      - name: Validate YAML files
+        run: |
+          python -c "
+          import yaml
+          import sys
+          import glob
+          
+          yaml_files = glob.glob('**/*.yml', recursive=True) + glob.glob('**/*.yaml', recursive=True)
+          
+          for file in yaml_files:
+              try:
+                  with open(file, 'r') as f:
+                      yaml.safe_load(f)
+                  print(f'✅ {file} is valid YAML')
+              except yaml.YAMLError as e:
+                  print(f'❌ {file} has YAML syntax error: {e}')
+                  sys.exit(1)
+          "
+      
+      - name: Validate VERSION.dat
+        run: |
+          if [ ! -f "VERSION.dat" ]; then
+            echo "❌ VERSION.dat not found"
+            exit 1
+          fi
+          
+          # Check for required fields
+          if ! grep -q "MAJOR=" VERSION.dat; then
+            echo "❌ VERSION.dat missing MAJOR field"
+            exit 1
+          fi
+          
+          if ! grep -q "MINOR=" VERSION.dat; then
+            echo "❌ VERSION.dat missing MINOR field"
+            exit 1
+          fi
+          
+          if ! grep -q "PATCH=" VERSION.dat; then
+            echo "❌ VERSION.dat missing PATCH field"
+            exit 1
+          fi
+          
+          echo "✅ VERSION.dat is valid"
+      
+      - name: Test conanfile.py basic functionality
+        run: |
+          python -c "
+          import sys
+          sys.path.append('.')
+          from conanfile import OpenSSLConan
+          
+          # Test basic instantiation
+          conan = OpenSSLConan()
+          conan.recipe_folder = '.'
+          
+          # Test version detection
+          try:
+              conan.set_version()
+              print(f'✅ Version detection works: {conan.version}')
+          except Exception as e:
+              print(f'❌ Version detection failed: {e}')
+              sys.exit(1)
+          
+          # Test basic configure
+          try:
+              conan.configure()
+              print('✅ Basic configure works')
+          except Exception as e:
+              print(f'❌ Configure failed: {e}')
+              sys.exit(1)
+          "
+
+  workflow-validation:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Validate GitHub Actions workflows
+        run: |
+          # Check for required workflows
+          if [ ! -f ".github/workflows/trigger-tools.yml" ]; then
+            echo "❌ Missing trigger-tools.yml workflow"
+            exit 1
+          fi
+          
+          if [ ! -f ".github/workflows/basic-validation.yml" ]; then
+            echo "❌ Missing basic-validation.yml workflow"
+            exit 1
+          fi
+          
+          echo "✅ Required workflows are present"
+      
+      - name: Check workflow syntax
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const yaml = require('js-yaml');
+            
+            const workflowFiles = [
+              '.github/workflows/trigger-tools.yml',
+              '.github/workflows/basic-validation.yml'
+            ];
+            
+            for (const file of workflowFiles) {
+              if (fs.existsSync(file)) {
+                try {
+                  const content = fs.readFileSync(file, 'utf8');
+                  yaml.load(content);
+                  console.log(`✅ ${file} has valid YAML syntax`);
+                } catch (error) {
+                  console.log(`❌ ${file} has invalid YAML syntax: ${error.message}`);
+                  process.exit(1);
+                }
+              }
+            }
+
+  repository-structure:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Validate minimal repository structure
+        run: |
+          echo "🔍 Validating minimal repository structure..."
+          
+          # Required files
+          required_files=(
+            "conanfile.py"
+            "VERSION.dat"
+            "Configure"
+            "config"
+            "conan/default.profile"
+            "conan/ci-minimal.yml"
+            ".github/workflows/trigger-tools.yml"
+            ".github/workflows/basic-validation.yml"
+          )
+          
+          for file in "${required_files[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "❌ Missing required file: $file"
+              exit 1
+            else
+              echo "✅ Found: $file"
+            fi
+          done
+          
+          # Check that complex orchestration files are NOT present
+          # (they should be moved to openssl-tools)
+          forbidden_paths=(
+            "scripts/conan/conan_orchestrator.py"
+            "scripts/ci/conan_automation.py"
+            "conan-dev/"
+            "conan-profiles/"
+          )
+          
+          for path in "${forbidden_paths[@]}"; do
+            if [ -e "$path" ]; then
+              echo "⚠️  Found orchestration file that should be in openssl-tools: $path"
+              # Don't fail yet - this is during migration
+            fi
+          done
+          
+          echo "✅ Repository structure validation complete"

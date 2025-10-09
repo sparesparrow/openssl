@@ -1,0 +1,32 @@
+# Minimal CI configuration for OpenSSL repository
+# Complex orchestration handled by openssl-tools
+
+build_settings:
+  default_profile: "conan/default.profile"
+  skip_tests: false
+  
+validation:
+  syntax_check: true
+  basic_lint: true
+  version_validation: true
+  
+triggers:
+  tools_repository: "sparesparrow/openssl-tools"
+  event_type: "openssl-build-triggered"
+  
+paths_to_watch:
+  - "*.c"
+  - "*.h"
+  - "Configure"
+  - "config"
+  - "conanfile.py"
+  - "VERSION.dat"
+  - "apps/**"
+  - "crypto/**"
+  - "ssl/**"
+  - "include/**"
+  - "providers/**"
+  - "engines/**"
+  - "fuzz/**"
+  - "test/**"
+  - "demos/**"

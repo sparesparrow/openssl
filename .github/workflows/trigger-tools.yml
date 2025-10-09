@@ -41,6 +41,7 @@ on:
 env:
   TOOLS_REPO: sparesparrow/openssl-tools
   EVENT_TYPE: openssl-build-triggered
+  # Minimal repository - complex orchestration in openssl-tools
 
 jobs:
   trigger-tools-ci:
