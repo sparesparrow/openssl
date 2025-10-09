@@ -435,3 +435,13 @@ doc-nits
 .cache/
 compile_commands.json
 
+# Conan
+.conan/
+conan.lock
+conanbuildinfo.*
+CMakeUserPresets.json
+build/
+test_package/build/
+.conan2/
+artifactory.token
+
