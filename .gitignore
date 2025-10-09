@@ -442,12 +442,11 @@ compile_commands.json
 
 # Conan
 .conan/
+.conan2/
 conan.lock
 conanbuildinfo.*
 CMakeUserPresets.json
 build/
 test_package/build/
-# Note: .conan2/ is kept for essential profiles
-# .conan2/
 artifactory.token
 

@@ -45,7 +45,7 @@ jobs:
       - name: Validate Conan profiles
         run: |
           echo "Validating Conan profiles..."
-          for profile in .conan2/profiles/*.profile; do
+          for profile in conan-profiles/*.profile; do
             echo "Validating $profile"
             conan profile show --profile="$profile" || echo "Profile $profile validation failed"
           done
@@ -55,6 +55,5 @@ jobs:
         run: |
           echo "Checking required files exist..."
           test -f conanfile.py || (echo "❌ conanfile.py missing" && exit 1)
-          test -d .conan2/profiles || (echo "❌ .conan2/profiles directory missing" && exit 1)
-          test -f .conan2/conan.conf || (echo "❌ .conan2/conan.conf missing" && exit 1)
+          test -d conan-profiles || (echo "❌ conan-profiles directory missing" && exit 1)
           echo "✅ File structure validation passed"
