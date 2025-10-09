@@ -1,0 +1,25 @@
+name: Trigger OpenSSL Tools
+
+on:
+  push:
+    branches: [ master, openssl-3.* ]
+  pull_request:
+    branches: [ master, openssl-3.* ]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    uses: ./.github/workflows/basic-validation.yml
+
+  trigger-tools:
+    needs: validate  # ← KRITICKÉ! Spustí se POUZE po úspěšné validaci
+    runs-on: ubuntu-latest
+    if: success()  # Dodatečná ochrana
+    steps:
+      - name: Trigger OpenSSL Tools CI
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.OPENSSL_TOOLS_TOKEN }}
+          repository: sparesparrow/openssl-tools
+          event-type: openssl-ci-trigger
+          client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}", "repository": "${{ github.repository }}", "event_name": "${{ github.event_name }}"}'

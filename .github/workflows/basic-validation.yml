@@ -9,8 +9,9 @@ on:
       - 'conanfile.py'
       - 'VERSION.dat'
       - '.github/workflows/**'
+      - 'conan-profiles/**'
   push:
-    branches: [main, master]
+    branches: [main, master, openssl-3.*]
     paths:
       - '*.py'
       - '*.yml'
@@ -18,6 +19,8 @@ on:
       - 'conanfile.py'
       - 'VERSION.dat'
       - '.github/workflows/**'
+      - 'conan-profiles/**'
+  workflow_dispatch:
 
 jobs:
   syntax-validation:
@@ -34,7 +37,8 @@ jobs:
       
       - name: Install dependencies
         run: |
-          pip install conan pyyaml
+          pip install conan>=2.0
+          pip install pyyaml
       
       - name: Validate conanfile.py syntax
         run: |
@@ -113,6 +117,38 @@ jobs:
               sys.exit(1)
           "
 
+  conan-validation:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      
+      - name: Install dependencies
+        run: |
+          pip install conan>=2.0
+          pip install pyyaml
+      
+      - name: Validate conanfile.py
+        run: |
+          echo "Validating conanfile.py..."
+          conan inspect . --format=json
+          echo "✅ Conanfile validation passed"
+      
+      - name: Validate Conan profiles
+        run: |
+          echo "Validating Conan profiles..."
+          for profile in conan-profiles/*.profile; do
+            echo "Validating $profile"
+            conan profile show --profile="$profile" || echo "Profile $profile validation failed"
+          done
+          echo "✅ Conan profiles validation passed"
+
   workflow-validation:
     runs-on: ubuntu-latest
     
@@ -123,8 +159,8 @@ jobs:
       - name: Validate GitHub Actions workflows
         run: |
           # Check for required workflows
-          if [ ! -f ".github/workflows/trigger-tools.yml" ]; then
-            echo "❌ Missing trigger-tools.yml workflow"
+          if [ ! -f ".github/workflows/trigger-openssl-tools.yml" ]; then
+            echo "❌ Missing trigger-openssl-tools.yml workflow"
             exit 1
           fi
           
@@ -143,7 +179,7 @@ jobs:
             const yaml = require('js-yaml');
             
             const workflowFiles = [
-              '.github/workflows/trigger-tools.yml',
+              '.github/workflows/trigger-openssl-tools.yml',
               '.github/workflows/basic-validation.yml'
             ];
             
@@ -177,9 +213,7 @@ jobs:
             "VERSION.dat"
             "Configure"
             "config"
-            "conan/default.profile"
-            "conan/ci-minimal.yml"
-            ".github/workflows/trigger-tools.yml"
+            ".github/workflows/trigger-openssl-tools.yml"
             ".github/workflows/basic-validation.yml"
           )
           
@@ -192,13 +226,21 @@ jobs:
             fi
           done
           
+          # Check for conan-profiles directory
+          if [ ! -d "conan-profiles" ]; then
+            echo "❌ Missing conan-profiles directory"
+            exit 1
+          else
+            echo "✅ Found: conan-profiles directory"
+          fi
+          
           # Check that complex orchestration files are NOT present
           # (they should be moved to openssl-tools)
           forbidden_paths=(
             "scripts/conan/conan_orchestrator.py"
             "scripts/ci/conan_automation.py"
             "conan-dev/"
-            "conan-profiles/"
+            "conan-profiles/"  # This should be conan-profiles/ not conan-profiles/
           )
           
           for path in "${forbidden_paths[@]}"; do

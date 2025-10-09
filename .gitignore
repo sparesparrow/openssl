@@ -435,13 +435,18 @@ doc-nits
 .cache/
 compile_commands.json
 
+# IDE-specific directories (personal preferences)
+.cursor2/
+.vscode/
+.idea/
+
 # Conan
 .conan/
+.conan2/
 conan.lock
 conanbuildinfo.*
 CMakeUserPresets.json
 build/
 test_package/build/
-.conan2/
 artifactory.token
 
