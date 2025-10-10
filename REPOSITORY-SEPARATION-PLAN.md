@@ -1,81 +1,40 @@
-# OpenSSL Repository Separation Plan
+# OpenSSL Repository Separation Plan - Final Architecture
 
-## Cíl
-Separovat build orchestraci, skripty pro matrix/status/metrics a warm-up do `openssl-tools`, zatímco `openssl` repo bude obsahovat pouze `conanfile.py`, minimální profily a trigger workflow.
+## Overview
+This document outlines the completed separation of build orchestration and advanced tooling into the `openssl-tools` repository to simplify the `openssl` repository and improve build system maintainability.
 
-## Struktura po separaci
+## Final Architecture
 
-### OpenSSL Repository (minimální)
+### OpenSSL Repository (Minimal & Focused)
 ```
 openssl/
-├── conanfile.py                    # Hlavní Conan recipe (zjednodušený)
+├── conanfile.py                    # Main Conan recipe (production)
+├── conanfile-minimal.py           # Minimal Conan recipe (optional)
 ├── conan/
-│   ├── default.profile            # Základní profil
-│   └── ci-minimal.yml             # Minimální CI konfigurace
+│   ├── default.profile            # Basic profile
+│   └── ci-minimal.yml             # Minimal CI configuration
 ├── .github/workflows/
-│   ├── trigger-tools.yml          # Trigger pro openssl-tools (zachovat)
-│   ├── basic-validation.yml       # Základní syntax/lint checks
-│   └── templates/
-│       └── standard-setup.yml     # Základní setup template
-├── VERSION.dat
-├── Configure
-├── config
-├── [všechny OpenSSL source soubory - apps/, crypto/, ssl/, include/, atd.]
-└── README.md                      # Aktualizovaný s odkazy na tools
+│   ├── trigger-tools.yml          # Trigger for openssl-tools
+│   └── basic-validation.yml       # Basic validation workflow
+├── VERSION.dat                     # OpenSSL version
+├── Configure                       # OpenSSL configure script
+├── config                         # OpenSSL config
+└── [OpenSSL source code]          # Core OpenSSL implementation
 ```
 
-### OpenSSL-Tools Repository (orchestrace)
+### OpenSSL-Tools Repository (Build Orchestration)
 ```
 openssl-tools/
 ├── scripts/
-│   ├── orchestration/
-│   │   ├── build_matrix_manager.py      # Z openssl/scripts/conan/
-│   │   ├── conan_orchestrator.py        # Z openssl/scripts/conan/
-│   │   ├── dependency_manager.py        # Z openssl/scripts/conan/
-│   │   └── performance_benchmark.py     # Z openssl/scripts/conan/
-│   ├── ci/
-│   │   ├── conan_automation.py          # Z openssl/scripts/ci/
-│   │   ├── performance_tests.py         # Z openssl/scripts/ci/
-│   │   ├── test_harness.py              # Z openssl/scripts/ci/
-│   │   └── deploy.py                    # Z openssl/scripts/ci/
-│   ├── validation/
-│   │   ├── pre-build-validation.py      # Z openssl/scripts/validation/
-│   │   ├── cache-optimization.py        # Z openssl/scripts/validation/
-│   │   ├── secure-key-manager.py        # Z openssl/scripts/validation/
-│   │   └── artifact-lifecycle-manager.py # Z openssl/scripts/validation/
-│   ├── metrics/
-│   │   ├── build_metrics_collector.py   # Nový
-│   │   ├── status_reporter.py           # Nový
-│   │   └── performance_analyzer.py      # Nový
-│   └── warm-up/
-│       ├── cache_warmer.py              # Nový
-│       ├── dependency_preloader.py      # Nový
-│       └── environment_preparer.py      # Nový
-├── profiles/
-│   ├── production/                      # Z openssl/conan-profiles/
-│   ├── development/                     # Z openssl/conan-dev/
-│   ├── testing/                         # Nové profily
-│   └── specialized/                     # FIPS, sanitizers, atd.
-├── configs/
-│   ├── ci-matrix.yml                    # Build matrix konfigurace
-│   ├── platform-configs.yml            # Platform-specific nastavení
-│   ├── artifact-lifecycle.yml          # Z openssl/conan-dev/
-│   └── cache-optimization.yml          # Z openssl/conan-dev/
-├── .github/workflows/
-│   ├── openssl-ci-dispatcher.yml       # Hlavní orchestrace (už existuje)
-│   ├── matrix-builds.yml               # Matrix build workflows
-│   ├── performance-tests.yml           # Performance testing
-│   ├── security-scans.yml              # Security scanning
-│   ├── artifact-management.yml         # Artifact lifecycle
-│   └── warm-up-caches.yml              # Cache warming
-├── templates/
-│   ├── conanfile-variants/             # Různé varianty conanfile.py
-│   ├── profile-templates/              # Template profily
-│   └── workflow-templates/             # GitHub Actions templates
-└── docs/
-    ├── BUILD-ORCHESTRATION.md
-    ├── MATRIX-CONFIGURATION.md
-    └── PERFORMANCE-OPTIMIZATION.md
+│   ├── orchestration/              # Build orchestration
+│   ├── ci/                         # CI/CD automation
+│   ├── validation/                 # Advanced validation
+│   ├── metrics/                    # Build metrics collection
+│   └── warm-up/                    # Cache warming
+├── profiles/                       # Advanced Conan profiles
+├── configs/                        # Configuration management
+├── .github/workflows/              # Advanced CI workflows
+└── docs/                          # Detailed documentation
 ```
 
 ## Migrace kroky

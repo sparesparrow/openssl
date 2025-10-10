@@ -3,23 +3,27 @@ name: Basic Validation
 on:
   pull_request:
     paths:
-      - '*.py'
-      - '*.yml'
-      - '*.yaml'
       - 'conanfile.py'
+      - 'conanfile-minimal.py'
       - 'VERSION.dat'
       - '.github/workflows/**'
-      - 'conan-profiles/**'
+      - 'conan/**.profile'
+      - 'conan/**.yml'
+      - '*.yml'
+      - '*.yaml'
+      - '*.py'
   push:
-    branches: [main, master, openssl-3.*]
+    branches: [main, master]
     paths:
-      - '*.py'
-      - '*.yml'
-      - '*.yaml'
-      - 'conanfile.py'
+      - 'conanfile.py' 
+      - 'conanfile-minimal.py'
       - 'VERSION.dat'
       - '.github/workflows/**'
-      - 'conan-profiles/**'
+      - 'conan/**.profile'
+      - 'conan/**.yml'
+      - '*.yml'
+      - '*.yaml'
+      - '*.py'
   workflow_dispatch:
 
 jobs:
@@ -40,10 +44,16 @@ jobs:
           pip install conan>=2.0
           pip install pyyaml
       
-      - name: Validate conanfile.py syntax
+      - name: Validate conanfile.py and conanfile-minimal.py syntax
         run: |
+          echo "🔍 Validating conanfile syntax..."
           python -m py_compile conanfile.py
           echo "✅ conanfile.py syntax is valid"
+          
+          if [ -f "conanfile-minimal.py" ]; then
+            python -m py_compile conanfile-minimal.py
+            echo "✅ conanfile-minimal.py syntax is valid"
+          fi
       
       - name: Validate YAML files
         run: |
@@ -91,16 +101,16 @@ jobs:
       
       - name: Test conanfile.py basic functionality
         run: |
+          echo "🔍 Testing conanfile functionality..."
           python -c "
           import sys
           sys.path.append('.')
-          from conanfile import OpenSSLConan
           
-          # Test basic instantiation
+          # Test main conanfile.py
+          from conanfile import OpenSSLConan
           conan = OpenSSLConan()
           conan.recipe_folder = '.'
           
-          # Test version detection
           try:
               conan.set_version()
               print(f'✅ Version detection works: {conan.version}')
@@ -108,7 +118,6 @@ jobs:
               print(f'❌ Version detection failed: {e}')
               sys.exit(1)
           
-          # Test basic configure
           try:
               conan.configure()
               print('✅ Basic configure works')
@@ -116,6 +125,37 @@ jobs:
               print(f'❌ Configure failed: {e}')
               sys.exit(1)
           "
+          
+          # Test conanfile-minimal.py if it exists
+          if [ -f "conanfile-minimal.py" ]; then
+            echo "🔍 Testing conanfile-minimal.py functionality..."
+            python -c "
+            import sys
+            import importlib.util
+            
+            # Load conanfile-minimal.py
+            spec = importlib.util.spec_from_file_location('conanfile_minimal', 'conanfile-minimal.py')
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            
+            conan = module.OpenSSLConan()
+            conan.recipe_folder = '.'
+            
+            try:
+                conan.set_version()
+                print(f'✅ Minimal conanfile version detection works: {conan.version}')
+            except Exception as e:
+                print(f'❌ Minimal conanfile version detection failed: {e}')
+                sys.exit(1)
+            
+            try:
+                conan.configure()
+                print('✅ Minimal conanfile configure works')
+            except Exception as e:
+                print(f'❌ Minimal conanfile configure failed: {e}')
+                sys.exit(1)
+            "
+          fi
 
   conan-validation:
     runs-on: ubuntu-latest
@@ -142,12 +182,29 @@ jobs:
       
       - name: Validate Conan profiles
         run: |
-          echo "Validating Conan profiles..."
-          for profile in conan-profiles/*.profile; do
-            echo "Validating $profile"
-            conan profile show --profile="$profile" || echo "Profile $profile validation failed"
-          done
-          echo "✅ Conan profiles validation passed"
+          echo "🔍 Validating Conan profiles..."
+          
+          # Check conan/ directory profiles  
+          if [ -d "conan" ]; then
+            for profile in conan/*.profile; do
+              if [ -f "$profile" ]; then
+                echo "Validating $profile"
+                # Basic syntax check - profiles should be parseable as INI-style
+                python -c "
+                import configparser
+                try:
+                    config = configparser.ConfigParser()
+                    config.read('$profile')
+                    print('✅ $profile is valid')
+                except Exception as e:
+                    print('❌ $profile has syntax error:', e)
+                    exit(1)
+                "
+              fi
+            done
+          fi
+          
+          echo "✅ Conan profiles validation completed"
 
   workflow-validation:
     runs-on: ubuntu-latest
@@ -159,13 +216,13 @@ jobs:
       - name: Validate GitHub Actions workflows
         run: |
           # Check for required workflows
-          if [ ! -f ".github/workflows/trigger-openssl-tools.yml" ]; then
-            echo "❌ Missing trigger-openssl-tools.yml workflow"
+          if [ ! -f ".github/workflows/trigger-tools.yml" ]; then
+            echo "❌ Missing trigger-tools.yml workflow"
             exit 1
           fi
           
           if [ ! -f ".github/workflows/basic-validation.yml" ]; then
-            echo "❌ Missing basic-validation.yml workflow"
+            echo "❌ Missing basic-validation.yml workflow"  
             exit 1
           fi
           
@@ -179,7 +236,7 @@ jobs:
             const yaml = require('js-yaml');
             
             const workflowFiles = [
-              '.github/workflows/trigger-openssl-tools.yml',
+              '.github/workflows/trigger-tools.yml',
               '.github/workflows/basic-validation.yml'
             ];
             
@@ -207,13 +264,13 @@ jobs:
         run: |
           echo "🔍 Validating minimal repository structure..."
           
-          # Required files
+          # Required files for minimal repository
           required_files=(
             "conanfile.py"
             "VERSION.dat"
-            "Configure"
+            "Configure" 
             "config"
-            ".github/workflows/trigger-openssl-tools.yml"
+            ".github/workflows/trigger-tools.yml"
             ".github/workflows/basic-validation.yml"
           )
           
@@ -226,27 +283,42 @@ jobs:
             fi
           done
           
-          # Check for conan-profiles directory
-          if [ ! -d "conan-profiles" ]; then
-            echo "❌ Missing conan-profiles directory"
+          # Check for conan directory (replaces conan-profiles)
+          if [ ! -d "conan" ]; then
+            echo "❌ Missing conan/ directory"
             exit 1
           else
-            echo "✅ Found: conan-profiles directory"
+            echo "✅ Found: conan/ directory"
           fi
           
-          # Check that complex orchestration files are NOT present
-          # (they should be moved to openssl-tools)
-          forbidden_paths=(
-            "scripts/conan/conan_orchestrator.py"
-            "scripts/ci/conan_automation.py"
-            "conan-dev/"
-            "conan-profiles/"  # This should be conan-profiles/ not conan-profiles/
+          # Optional files that support the minimal repository
+          optional_files=(
+            "conanfile-minimal.py"
+            "conan/default.profile"
+            "conan/ci-minimal.yml"
           )
           
-          for path in "${forbidden_paths[@]}"; do
+          for file in "${optional_files[@]}"; do
+            if [ -f "$file" ]; then
+              echo "✅ Found optional: $file"
+            fi
+          done
+          
+          # Warn about orchestration files that should be in openssl-tools
+          # Note: During migration, these files may still exist
+          orchestration_files=(
+            "scripts/conan/conan_orchestrator.py"
+            "scripts/ci/conan_automation.py" 
+            "conan-dev/"
+            "openssl-tools-structure/"
+          )
+          
+          echo ""
+          echo "🔍 Checking for orchestration files (should be moved to openssl-tools):"
+          for path in "${orchestration_files[@]}"; do
             if [ -e "$path" ]; then
-              echo "⚠️  Found orchestration file that should be in openssl-tools: $path"
-              # Don't fail yet - this is during migration
+              echo "⚠️  Migration pending - found: $path"
+              echo "   This should be moved to openssl-tools repository"
             fi
           done
           

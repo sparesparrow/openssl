@@ -73,9 +73,15 @@ class OpenSSLConan(ConanFile):
             self.tool_requires("strawberryperl/5.32.0.1")
         
     def requirements(self):
-        """Minimal runtime requirements"""
-        # Only essential dependencies - complex dependency management in openssl-tools
-        pass
+        """Minimal runtime requirements - only essential dependencies"""
+        # Only include dependencies that are absolutely necessary for basic builds
+        # Complex dependency management handled by openssl-tools
+        if self.settings.os == "Windows":
+            # Windows builds may need specific dependencies
+            pass
+        
+        # Note: zlib and other optional dependencies are handled by openssl-tools
+        # This minimal version focuses on core OpenSSL functionality only
         
     def set_version(self):
         """Dynamically determine version from VERSION.dat"""
@@ -185,26 +191,60 @@ class OpenSSLConan(ConanFile):
         
     def build(self):
         """Basic build - complex orchestration handled by openssl-tools"""
-        # Configure OpenSSL
-        configure_args = self._get_configure_command()
-        self.run(" ".join(configure_args))
-        
-        # Build
-        jobs = os.getenv("CONAN_CPU_COUNT", "1")
-        self.run(f"make -j{jobs}")
-        
-        # Run tests if enabled
-        if self.options.enable_unit_test and not self._should_skip_tests():
-            self.run("make test")
+        try:
+            # Configure OpenSSL
+            configure_args = self._get_configure_command()
+            self.output.info("Configuring OpenSSL...")
+            self.run(" ".join(configure_args))
+            
+            # Build
+            jobs = os.getenv("CONAN_CPU_COUNT", str(os.cpu_count() or 1))
+            self.output.info(f"Building OpenSSL with {jobs} parallel jobs...")
+            self.run(f"make -j{jobs}")
+            
+            # Run tests if enabled
+            if self.options.enable_unit_test and not self._should_skip_tests():
+                self.output.info("Running OpenSSL tests...")
+                self.run("make test")
+                
+        except Exception as e:
+            self.output.error(f"Build failed: {e}")
+            raise
             
     def _should_skip_tests(self):
         """Check if tests should be skipped"""
         return os.getenv("CONAN_SKIP_TESTS", "false").lower() == "true"
             
     def package(self):
-        """Basic packaging"""
-        self.run("make install_sw install_ssldirs")
-        copy(self, "LICENSE.txt", src=".", dst=os.path.join(self.package_folder, "licenses"))
+        """Basic packaging with essential components"""
+        try:
+            self.output.info("Installing OpenSSL...")
+            self.run("make install_sw install_ssldirs")
+            
+            # Copy license and documentation
+            copy(self, "LICENSE.txt", src=".", dst=os.path.join(self.package_folder, "licenses"))
+            
+            # Create basic package metadata
+            metadata = {
+                "name": self.name,
+                "version": str(self.version),
+                "description": "Minimal OpenSSL build - orchestration handled by openssl-tools",
+                "build_type": str(self.settings.build_type),
+                "arch": str(self.settings.arch),
+                "os": str(self.settings.os),
+                "compiler": str(self.settings.compiler),
+                "fips_enabled": bool(self.options.fips)
+            }
+            
+            metadata_file = os.path.join(self.package_folder, "conaninfo.json")
+            with open(metadata_file, 'w') as f:
+                json.dump(metadata, f, indent=2)
+            
+            self.output.info("✅ OpenSSL packaging completed successfully")
+            
+        except Exception as e:
+            self.output.error(f"Packaging failed: {e}")
+            raise
         
     def package_info(self):
         """Basic package information"""
