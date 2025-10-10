@@ -1,0 +1,217 @@
+name: Fixed Trigger Tools
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'conanfile.py'
+      - 'VERSION.dat'
+      - 'crypto/**'
+      - 'ssl/**'
+      - 'apps/**'
+      - 'include/**'
+      - 'config'
+      - 'Configure'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'conanfile.py'
+      - 'VERSION.dat'
+      - 'crypto/**'
+      - 'ssl/**'
+      - 'apps/**'
+      - 'include/**'
+      - 'config'
+      - 'Configure'
+  workflow_dispatch:
+    inputs:
+      force_trigger:
+        description: 'Force trigger openssl-tools build'
+        required: false
+        default: 'false'
+
+jobs:
+  analyze-changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      should_trigger: ${{ steps.changes.outputs.should_trigger }}
+      build_scope: ${{ steps.changes.outputs.build_scope }}
+      source_sha: ${{ steps.changes.outputs.source_sha }}
+      source_ref: ${{ steps.changes.outputs.source_ref }}
+    
+    steps:
+      - name: Checkout OpenSSL source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Analyze changes
+        id: changes
+        run: |
+          echo "🔍 Analyzing changes to determine build scope..."
+          
+          # Force trigger if requested
+          if [ "${{ github.event.inputs.force_trigger }}" = "true" ]; then
+            echo "should_trigger=true" >> $GITHUB_OUTPUT
+            echo "build_scope=full" >> $GITHUB_OUTPUT
+            echo "source_sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+            echo "source_ref=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "✅ Force trigger requested"
+            exit 0
+          fi
+          
+          # Check if this is a pull request
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "📋 Pull request detected"
+            echo "should_trigger=true" >> $GITHUB_OUTPUT
+            echo "build_scope=pr" >> $GITHUB_OUTPUT
+            echo "source_sha=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
+            echo "source_ref=${{ github.event.pull_request.head.ref }}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Check if this is a push to main/master
+          if [ "${{ github.ref_name }}" = "main" ] || [ "${{ github.ref_name }}" = "master" ]; then
+            echo "📋 Push to main/master detected"
+            echo "should_trigger=true" >> $GITHUB_OUTPUT
+            echo "build_scope=main" >> $GITHUB_OUTPUT
+            echo "source_sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+            echo "source_ref=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Check for specific file changes
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "🔍 Checking for relevant file changes..."
+            
+            # Get list of changed files
+            changed_files=$(git diff --name-only HEAD~1 HEAD)
+            echo "Changed files: $changed_files"
+            
+            # Check if any relevant files changed
+            if echo "$changed_files" | grep -E "(conanfile\.py|VERSION\.dat|crypto/|ssl/|apps/|include/|config|Configure)"; then
+              echo "✅ Relevant files changed"
+              echo "should_trigger=true" >> $GITHUB_OUTPUT
+              echo "build_scope=incremental" >> $GITHUB_OUTPUT
+              echo "source_sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+              echo "source_ref=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            else
+              echo "⏭️  No relevant files changed, skipping trigger"
+              echo "should_trigger=false" >> $GITHUB_OUTPUT
+              echo "build_scope=none" >> $GITHUB_OUTPUT
+              echo "source_sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+              echo "source_ref=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            fi
+          fi
+      
+      - name: Log analysis results
+        run: |
+          echo "📊 Change analysis results:"
+          echo "  Should trigger: ${{ steps.changes.outputs.should_trigger }}"
+          echo "  Build scope: ${{ steps.changes.outputs.build_scope }}"
+          echo "  Source SHA: ${{ steps.changes.outputs.source_sha }}"
+          echo "  Source ref: ${{ steps.changes.outputs.source_ref }}"
+  
+  trigger-openssl-tools:
+    needs: analyze-changes
+    if: needs.analyze-changes.outputs.should_trigger == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+      - name: Trigger openssl-tools build
+        run: |
+          echo "🚀 Triggering openssl-tools build..."
+          
+          # Prepare payload
+          payload=$(cat <<EOF
+          {
+            "source_repo_sha": "${{ needs.analyze-changes.outputs.source_sha }}",
+            "source_repo_ref": "${{ needs.analyze-changes.outputs.source_ref }}",
+            "build_scope": "${{ needs.analyze-changes.outputs.build_scope }}",
+            "triggered_by": "${{ github.actor }}",
+            "triggered_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "github_event": "${{ github.event_name }}",
+            "github_ref": "${{ github.ref }}",
+            "github_repository": "${{ github.repository }}"
+          }
+          EOF
+          )
+          
+          echo "Payload: $payload"
+          
+          # Trigger openssl-tools workflow
+          response=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "$payload" \
+            "https://api.github.com/repos/sparesparrow/openssl-tools/dispatches" \
+            -d '{"event_type": "openssl-build-request"}')
+          
+          http_code=$(echo "$response" | tail -n1)
+          response_body=$(echo "$response" | head -n -1)
+          
+          echo "Response code: $http_code"
+          echo "Response body: $response_body"
+          
+          if [ "$http_code" -eq 204 ]; then
+            echo "✅ Successfully triggered openssl-tools build"
+          else
+            echo "❌ Failed to trigger openssl-tools build"
+            echo "HTTP code: $http_code"
+            echo "Response: $response_body"
+            exit 1
+          fi
+      
+      - name: Create check run
+        run: |
+          echo "📋 Creating check run for build status..."
+          
+          # Create a check run to track the build status
+          check_payload=$(cat <<EOF
+          {
+            "name": "openssl-tools-integration",
+            "head_sha": "${{ needs.analyze-changes.outputs.source_sha }}",
+            "status": "in_progress",
+            "details_url": "https://github.com/sparesparrow/openssl-tools/actions",
+            "output": {
+              "title": "OpenSSL Tools Integration",
+              "summary": "Build triggered in openssl-tools repository",
+              "text": "Build scope: ${{ needs.analyze-changes.outputs.build_scope }}\nSource ref: ${{ needs.analyze-changes.outputs.source_ref }}\nTriggered by: ${{ github.actor }}"
+            }
+          }
+          EOF
+          )
+          
+          response=$(curl -s -w "\n%{http_code}" \
+            -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "$check_payload" \
+            "https://api.github.com/repos/${{ github.repository }}/check-runs")
+          
+          http_code=$(echo "$response" | tail -n1)
+          response_body=$(echo "$response" | head -n -1)
+          
+          echo "Check run response code: $http_code"
+          echo "Check run response: $response_body"
+          
+          if [ "$http_code" -eq 201 ]; then
+            echo "✅ Check run created successfully"
+          else
+            echo "⚠️  Failed to create check run (non-critical)"
+          fi
+      
+      - name: Log trigger summary
+        run: |
+          echo "🎉 Trigger summary:"
+          echo "  ✅ openssl-tools build triggered"
+          echo "  📋 Build scope: ${{ needs.analyze-changes.outputs.build_scope }}"
+          echo "  🔗 Source SHA: ${{ needs.analyze-changes.outputs.source_sha }}"
+          echo "  🌿 Source ref: ${{ needs.analyze-changes.outputs.source_ref }}"
+          echo "  👤 Triggered by: ${{ github.actor }}"
+          echo "  📅 Triggered at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
