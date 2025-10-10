@@ -107,35 +107,7 @@ jobs:
           echo "✅ VERSION.dat is valid"
       
       - name: Test conanfile.py basic functionality
-        run: |
-          python -c "
-          import sys
-          sys.path.append('.')
-          from conanfile import OpenSSLConan
-          
-          # Test basic instantiation
-          conan = OpenSSLConan()
-          conan.recipe_folder = '.'
-          
-          # Test version detection
-          try:
-              conan.set_version()
-              print(f'✅ Version detection works: {conan.version}')
-          except Exception as e:
-              print(f'❌ Version detection failed: {e}')
-              sys.exit(1)
-          
-          # Test that the class can be imported and basic attributes exist
-          try:
-              assert hasattr(conan, 'name')
-              assert hasattr(conan, 'version')
-              assert hasattr(conan, 'options')
-              assert hasattr(conan, 'settings')
-              print('✅ Basic class structure is valid')
-          except Exception as e:
-              print(f'❌ Class structure validation failed: {e}')
-              sys.exit(1)
-          "
+        run: python scripts/validate_conanfile.py
 
   conan-validation:
     runs-on: ubuntu-latest

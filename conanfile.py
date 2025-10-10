@@ -126,69 +126,134 @@ class OpenSSLConan(ConanFile):
             raise ConanInvalidConfiguration("QUIC protocol requires threading support")
             
     def export_sources(self):
-        """Export full source tree for reproducible builds"""
-        # Export all source files - critical for reproducible builds
+        """Export source tree"""
         copy(self, "*", src=self.recipe_folder, dst=self.export_sources_folder)
         
     def layout(self):
-        """Use basic layout for OpenSSL's in-tree build system"""
-        # OpenSSL builds in-tree, so we don't separate source and build
+        """Basic layout for OpenSSL's in-tree build system"""
         pass
         
     def generate(self):
-        """Generate Autotools toolchain and dependencies"""
-        # Generate dependencies
+        """Generate basic toolchain"""
         deps = AutotoolsDeps(self)
         deps.generate()
         
-        # Generate Autotools toolchain
         tc = AutotoolsToolchain(self)
-        
-        # Configure OpenSSL-specific environment
-        self._configure_openssl_environment(tc)
-        
         tc.generate()
         
-    def _configure_openssl_environment(self, tc):
-        """Configure OpenSSL-specific environment variables and flags"""
-        # Set OpenSSL configuration environment
-        if self.options.openssldir:
-            tc.environment.define("OPENSSL_CONF", str(self.options.openssldir))
-        
-        # Configure compiler flags for OpenSSL
-        if self.settings.build_type == "Debug":
-            tc.environment.define("CFLAGS", "-g -O0")
-            tc.environment.define("CXXFLAGS", "-g -O0")
-        elif self.settings.build_type == "Release":
-            tc.environment.define("CFLAGS", "-O2 -DNDEBUG")
-            tc.environment.define("CXXFLAGS", "-O2 -DNDEBUG")
-        
-        # Add strict warnings for CI builds
-        if os.getenv("OSSL_RUN_CI_TESTS"):
-            tc.environment.append("CFLAGS", "-Wall -Wextra -Werror")
-            tc.environment.append("CXXFLAGS", "-Wall -Wextra -Werror")
-        
-        # Configure threading
-        if not self.options.no_threads:
-            if self.settings.os == "Linux":
-                tc.environment.define("THREADS", "pthread")
-            elif self.settings.os == "Windows":
-                tc.environment.define("THREADS", "win32")
-        
-        # Configure assembly optimizations
-        if not self.options.no_asm:
-            if self.settings.arch == "x86_64":
-                tc.environment.define("ASM", "x86_64")
-            elif self.settings.arch == "armv8":
-                tc.environment.define("ASM", "aarch64")
-        
-        # Configure FIPS
-        if self.options.fips:
-            tc.environment.define("FIPS", "1")
-            tc.environment.define("FIPS_MODULE", "1")
-        
     def _get_configure_command(self):
-        """Generate OpenSSL configure command based on options"""
+        """Generate basic OpenSSL configure command"""
+        args = ["./config", "--banner=Configured"]
+        
+        if not os.path.exists("./config"):
+            raise ConanInvalidConfiguration("OpenSSL config script not found")
+        
+        # Basic options only
+        if not self.options.shared:
+            args.append("no-shared")
+            
+        if self.options.fips:
+            args.append("enable-fips")
+            
+        if self.options.no_asm:
+            args.append("no-asm")
+            
+        if self.options.no_threads:
+            args.append("no-threads")
+            
+        if self.options.enable_quic:
+            args.append("enable-quic")
+            
+        if self.options.no_deprecated:
+            args.append("no-deprecated")
+        
+        # Directories
+        if self.options.openssldir:
+            args.append(f"--openssldir={self.options.openssldir}")
+        else:
+            args.append(f"--openssldir={os.path.join(self.package_folder, 'ssl')}")
+            
+        args.append(f"--prefix={self.package_folder}")
+        
+        # Build type
+        if self.settings.build_type == "Debug":
+            args.append("--debug")
+        elif self.settings.build_type == "Release":
+            args.append("--release")
+            
+        self.output.info(f"Configure command: {' '.join(args)}")
+        return args
+        
+    def build(self):
+        """Basic build - complex orchestration handled by openssl-tools"""
+        # Configure OpenSSL
+        configure_args = self._get_configure_command()
+        self.run(" ".join(configure_args))
+        
+        # Build
+        jobs = os.getenv("CONAN_CPU_COUNT", "1")
+        self.run(f"make -j{jobs}")
+        
+        # Run tests if enabled
+        if self.options.enable_unit_test and not self._should_skip_tests():
+            self.run("make test")
+            
+    def _should_skip_tests(self):
+        """Check if tests should be skipped"""
+        return os.getenv("CONAN_SKIP_TESTS", "false").lower() == "true"
+            
+    def package(self):
+        """Basic packaging"""
+        self.run("make install_sw install_ssldirs")
+        copy(self, "LICENSE.txt", src=".", dst=os.path.join(self.package_folder, "licenses"))
+        
+    def package_info(self):
+        """Basic package information"""
+        # Separate components for proper dependency resolution
+        self.cpp_info.components["ssl"].libs = ["ssl"]
+        self.cpp_info.components["ssl"].requires = ["crypto"]
+        self.cpp_info.components["crypto"].libs = ["crypto"]
+        
+        # Platform-specific system libraries
+        if self.settings.os == "Linux":
+            self.cpp_info.components["ssl"].system_libs.extend(["dl", "pthread"])
+            self.cpp_info.components["crypto"].system_libs.extend(["dl", "pthread"])
+        elif self.settings.os == "Windows":
+            self.cpp_info.components["ssl"].system_libs.extend(["ws2_32", "gdi32", "advapi32", "crypt32", "user32"])
+            self.cpp_info.components["crypto"].system_libs.extend(["ws2_32", "gdi32", "advapi32", "crypt32", "user32"])
+        elif self.settings.os == "Macos":
+            self.cpp_info.components["ssl"].frameworks.append("Security")
+            self.cpp_info.components["crypto"].frameworks.append("Security")
+            
+        # Set paths
+        self.cpp_info.bindirs = ["bin"]
+        self.cpp_info.includedirs = ["include"]
+        self.cpp_info.libdirs = ["lib"]
+        
+        # Environment variables
+        self.env_info.PATH.append(os.path.join(self.package_folder, "bin"))
+        self.env_info.LD_LIBRARY_PATH.append(os.path.join(self.package_folder, "lib"))
+        
+        if self.options.openssldir:
+            self.env_info.OPENSSL_CONF = os.path.join(str(self.options.openssldir), "openssl.cnf")
+        else:
+            self.env_info.OPENSSL_CONF = os.path.join(self.package_folder, "ssl", "openssl.cnf")
+            
+    def package_id(self):
+        """Optimized package ID for caching"""
+        # Runtime path options don't affect binary compatibility
+        del self.info.options.openssldir
+        del self.info.options.cafile  
+        del self.info.options.capath
+        
+        # Test options don't affect package ID
+        del self.info.options.enable_unit_test
+        
+        # FIPS builds must have separate cache key
+        if self.info.options.fips:
+            self.info.options.fips = "fips_enabled"
+        else:
+            self.info.options.fips = "fips_disabled"
         args = ["./config", "--banner=Configured"]
         
         # Validate that config script exists

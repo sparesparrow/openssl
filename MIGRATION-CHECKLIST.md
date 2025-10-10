@@ -3,7 +3,7 @@
 ## Fáze 1: Příprava (✅ Dokončeno)
 
 ### OpenSSL Repository - Minimalizace
-- [x] Vytvořit zjednodušený `conanfile-minimal.py`
+- [x] Vytvořit zjednodušený `conanfile.py` (minimal version)
 - [x] Vytvořit základní profil `conan/default.profile`
 - [x] Vytvořit minimální CI konfiguraci `conan/ci-minimal.yml`
 - [x] Vytvořit `basic-validation.yml` workflow
@@ -60,7 +60,7 @@
 - [ ] Odstranit přesunuté skripty a konfigurace
 - [ ] Aktualizovat README.md s odkazy na openssl-tools
 - [ ] Vyčistit nepoužívané workflows
-- [ ] Nahradit `conanfile.py` za `conanfile-minimal.py`
+- [x] Nahradit `conanfile.py` za minimal version (✅ Dokončeno)
 
 ### OpenSSL-Tools finalizace
 - [ ] Dokončit všechny workflows
@@ -77,7 +77,7 @@
 
 ### Vytvořené soubory (OpenSSL - minimal)
 ```
-✅ conanfile-minimal.py              # Zjednodušený conanfile
+✅ conanfile.py (minimal)           # Zjednodušený conanfile
 ✅ conan/default.profile             # Základní profil
 ✅ conan/ci-minimal.yml             # Minimální CI konfigurace
 ✅ .github/workflows/basic-validation.yml  # Základní validace

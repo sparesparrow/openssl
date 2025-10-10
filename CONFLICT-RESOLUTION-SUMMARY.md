@@ -54,7 +54,7 @@ Successfully resolved merge conflicts in the "Separate openssl tools and repo st
 
 ### Preserved Files (no conflicts)
 - `conanfile.py` - Complex build orchestration preserved
-- `conanfile-minimal.py` - Minimal version for separated architecture
+- `conanfile.py` - Minimal version for separated architecture
 - `conan/default.profile` - Basic profile configuration
 - `conan/ci-minimal.yml` - Minimal CI configuration
 - `.github/workflows/basic-validation.yml` - Basic validation workflow
@@ -66,7 +66,7 @@ Successfully resolved merge conflicts in the "Separate openssl tools and repo st
 The conflict resolution maintains the repository separation goals:
 
 ### OpenSSL Repository (Current State)
-- ✅ Contains both current complex `conanfile.py` and minimal `conanfile-minimal.py`
+- ✅ Contains minimal `conanfile.py` optimized for separated architecture
 - ✅ Has trigger workflow for openssl-tools integration
 - ✅ Includes basic validation workflow
 - ✅ Maintains all existing functionality during transition
@@ -81,7 +81,7 @@ The conflict resolution maintains the repository separation goals:
 
 1. **Test Integration**: Verify trigger workflow works with openssl-tools
 2. **Complete Migration**: Move complex scripts to openssl-tools repository
-3. **Switch to Minimal**: Replace `conanfile.py` with `conanfile-minimal.py`
+3. **Switch to Minimal**: Use current `conanfile.py` (already minimal version)
 4. **Cleanup**: Remove migrated files from openssl repository
 
 ## Impact Assessment
