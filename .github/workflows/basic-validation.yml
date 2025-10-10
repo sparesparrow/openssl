@@ -1,85 +1,44 @@
 name: Basic Validation
 
+# Minimal validation for the separated OpenSSL repository
+# Complex orchestration handled by openssl-tools repository
+
 on:
   pull_request:
     paths:
-      - '*.py'
+      - 'conanfile.py'
+      - 'VERSION.dat'
+      - '.github/workflows/**'
       - '*.yml'
       - '*.yaml'
-      - 'conanfile*.py'
-      - 'VERSION.dat'
-      - 'Configure'
-      - 'config'
-      - '.github/workflows/**'
-      - 'conan-profiles/**'
-      - 'test_package/**'
   push:
-    branches: [main, master, openssl-3.*]
+    branches: [main, master]
     paths:
-      - '*.py'
+      - 'conanfile.py' 
+      - 'VERSION.dat'
+      - '.github/workflows/**'
       - '*.yml'
       - '*.yaml'
-      - 'conanfile*.py'
-      - 'VERSION.dat'
-      - 'Configure'
-      - 'config'
-      - '.github/workflows/**'
-      - 'conan-profiles/**'
-      - 'test_package/**'
   workflow_dispatch:
 
 jobs:
-  syntax-validation:
+  basic-validation:
     runs-on: ubuntu-latest
+    timeout-minutes: 10  # Should be very fast for basic validation
     
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       
-      - name: Set up Python
-        uses: actions/setup-python@v6
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       
-      - name: Install dependencies
+      - name: Install basic dependencies
         run: |
-          pip install conan>=2.0
-          pip install pyyaml
-      
-      - name: Validate conanfile.py syntax
-        run: |
-          echo "🔍 Validating conanfile.py syntax..."
-          if [ ! -f "conanfile.py" ]; then
-            echo "❌ conanfile.py not found"
-            exit 1
-          fi
-          
-          python -m py_compile conanfile.py
-          if [ $? -eq 0 ]; then
-            echo "✅ conanfile.py syntax is valid"
-          else
-            echo "❌ conanfile.py syntax validation failed"
-            exit 1
-          fi
-      
-      - name: Validate YAML files
-        run: |
-          python -c "
-          import yaml
-          import sys
-          import glob
-          
-          yaml_files = glob.glob('**/*.yml', recursive=True) + glob.glob('**/*.yaml', recursive=True)
-          
-          for file in yaml_files:
-              try:
-                  with open(file, 'r') as f:
-                      yaml.safe_load(f)
-                  print(f'✅ {file} is valid YAML')
-              except yaml.YAMLError as e:
-                  print(f'❌ {file} has YAML syntax error: {e}')
-                  sys.exit(1)
-          "
+          pip install conan>=2.0 pyyaml
+          echo "✅ Dependencies installed"
       
       - name: Validate VERSION.dat
         run: |
@@ -89,158 +48,184 @@ jobs:
           fi
           
           # Check for required fields
-          if ! grep -q "MAJOR=" VERSION.dat; then
-            echo "❌ VERSION.dat missing MAJOR field"
-            exit 1
-          fi
-          
-          if ! grep -q "MINOR=" VERSION.dat; then
-            echo "❌ VERSION.dat missing MINOR field"
-            exit 1
-          fi
-          
-          if ! grep -q "PATCH=" VERSION.dat; then
-            echo "❌ VERSION.dat missing PATCH field"
-            exit 1
-          fi
+          required_fields=("MAJOR=" "MINOR=" "PATCH=")
+          for field in "${required_fields[@]}"; do
+            if ! grep -q "$field" VERSION.dat; then
+              echo "❌ VERSION.dat missing required field: $field"
+              exit 1
+            fi
+          done
           
           echo "✅ VERSION.dat is valid"
       
-      - name: Test conanfile.py basic functionality
-        run: python scripts/validate_conanfile.py
-
-  conan-validation:
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-      
-      - name: Install dependencies
+      - name: Validate conanfile.py syntax
         run: |
-          pip install conan>=2.0
-          pip install pyyaml
-      
-      - name: Validate conanfile.py
-        run: |
-          echo "Validating conanfile.py..."
-          conan inspect . --format=json
-          echo "✅ Conanfile validation passed"
-      
-      - name: Validate Conan profiles
-        run: |
-          echo "Validating Conan profiles..."
-          for profile in conan-profiles/*.profile; do
-            echo "Validating $profile"
-            conan profile show --profile="$profile" || echo "Profile $profile validation failed"
-          done
-          echo "✅ Conan profiles validation passed"
-
-  workflow-validation:
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Validate GitHub Actions workflows
-        run: |
-          # Check for required workflows
-          if [ ! -f ".github/workflows/trigger-openssl-tools.yml" ]; then
-            echo "❌ Missing trigger-openssl-tools.yml workflow"
+          if [ ! -f "conanfile.py" ]; then
+            echo "❌ conanfile.py not found - this is required for openssl-tools integration"
             exit 1
           fi
           
-          if [ ! -f ".github/workflows/basic-validation.yml" ]; then
-            echo "❌ Missing basic-validation.yml workflow"
-            exit 1
-          fi
+          # Test Python syntax
+          python -m py_compile conanfile.py
+          echo "✅ conanfile.py syntax is valid"
           
-          echo "✅ Required workflows are present"
+          # Test basic functionality
+          python -c "
+          import sys
+          sys.path.append('.')
+          from conanfile import OpenSSLConan
+          
+          conan = OpenSSLConan()
+          conan.recipe_folder = '.'
+          
+          # Test version detection
+          try:
+              conan.set_version()
+              print(f'✅ Version detection works: {conan.version}')
+          except Exception as e:
+              print(f'❌ Version detection failed: {e}')
+              sys.exit(1)
+          
+          # Test basic configure
+          try:
+              conan.configure()
+              print('✅ Basic configure works')
+          except Exception as e:
+              print(f'❌ Configure failed: {e}')
+              sys.exit(1)
+          "
       
-      - name: Check workflow syntax
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const yaml = require('js-yaml');
-            
-            const workflowFiles = [
-              '.github/workflows/trigger-openssl-tools.yml',
-              '.github/workflows/basic-validation.yml'
-            ];
-            
-            for (const file of workflowFiles) {
-              if (fs.existsSync(file)) {
-                try {
-                  const content = fs.readFileSync(file, 'utf8');
-                  yaml.load(content);
-                  console.log(`✅ ${file} has valid YAML syntax`);
-                } catch (error) {
-                  console.log(`❌ ${file} has invalid YAML syntax: ${error.message}`);
-                  process.exit(1);
-                }
-              }
-            }
-
-  repository-structure:
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Validate minimal repository structure
+      - name: Validate required OpenSSL structure
         run: |
-          echo "🔍 Validating minimal repository structure..."
+          echo "🔍 Validating minimal OpenSSL repository structure..."
           
-          # Required files
-          required_files=(
-            "conanfile.py"
-            "VERSION.dat"
+          # Core OpenSSL files that must exist
+          required_items=(
             "Configure"
             "config"
-            ".github/workflows/trigger-openssl-tools.yml"
-            ".github/workflows/basic-validation.yml"
+            "crypto"
+            "ssl" 
+            "include"
+            "apps"
+            "providers"
           )
           
-          for file in "${required_files[@]}"; do
-            if [ ! -f "$file" ]; then
-              echo "❌ Missing required file: $file"
+          for item in "${required_items[@]}"; do
+            if [ ! -e "$item" ]; then
+              echo "❌ Missing required OpenSSL component: $item"
               exit 1
             else
-              echo "✅ Found: $file"
+              echo "✅ Found: $item"
             fi
           done
           
-          # Check for conan-profiles directory
-          if [ ! -d "conan-profiles" ]; then
-            echo "❌ Missing conan-profiles directory"
+          echo "✅ OpenSSL repository structure is valid"
+      
+      - name: Validate workflow files
+        run: |
+          echo "🔍 Validating GitHub Actions workflows..."
+          
+          # Check YAML syntax for all workflow files
+          for workflow in .github/workflows/*.yml .github/workflows/*.yaml; do
+            if [ -f "$workflow" ]; then
+              echo "Validating: $workflow"
+              python -c "
+          import yaml
+          import sys
+          
+          try:
+              with open('$workflow', 'r') as f:
+                  yaml.safe_load(f)
+              print('✅ $workflow has valid YAML syntax')
+          except yaml.YAMLError as e:
+              print('❌ $workflow has YAML syntax error: {e}')
+              sys.exit(1)
+          except Exception as e:
+              print('❌ Failed to validate $workflow: {e}')
+              sys.exit(1)
+              "
+            fi
+          done
+          
+          # Check that trigger-tools.yml exists (required for separation architecture)
+          if [ ! -f ".github/workflows/trigger-tools.yml" ]; then
+            echo "❌ Missing required workflow: trigger-tools.yml"
+            echo "This is required for openssl-tools integration"
             exit 1
-          else
-            echo "✅ Found: conan-profiles directory"
           fi
           
-          # Check that complex orchestration files are NOT present
-          # (they should be moved to openssl-tools)
-          forbidden_paths=(
-            "scripts/conan/conan_orchestrator.py"
-            "scripts/ci/conan_automation.py"
-            "conan-dev/"
-            "scripts/openssl_conan/"
-            "openssl-tools-workflows/"
-          )
+          echo "✅ Workflow validation complete"
+      
+      - name: Test openssl-tools integration setup
+        run: |
+          echo "🔍 Testing openssl-tools integration readiness..."
           
-          for path in "${forbidden_paths[@]}"; do
-            if [ -e "$path" ]; then
-              echo "⚠️  Found orchestration file that should be in openssl-tools: $path"
-              echo "   Migration status: Some files may still be present during transition"
-            fi
-          done
+          # Check that trigger workflow is properly configured
+          if ! grep -q "repository_dispatch" .github/workflows/trigger-tools.yml; then
+            echo "❌ trigger-tools.yml missing repository_dispatch configuration"
+            exit 1
+          fi
           
-          echo "✅ Repository structure validation complete"
+          if ! grep -q "sparesparrow/openssl-tools" .github/workflows/trigger-tools.yml; then
+            echo "❌ trigger-tools.yml not configured for sparesparrow/openssl-tools"
+            exit 1
+          fi
+          
+          echo "✅ OpenSSL-tools integration setup is ready"
+      
+      - name: Success Summary
+        if: success()
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+          ## ✅ Basic Validation - PASSED
+          
+          ### Validated Components
+          - ✅ VERSION.dat format and required fields
+          - ✅ conanfile.py syntax and basic functionality
+          - ✅ Required OpenSSL source structure  
+          - ✅ GitHub Actions workflows syntax
+          - ✅ OpenSSL-tools integration configuration
+          
+          ### Repository Status
+          - **Type:** Minimal OpenSSL repository (separated architecture)
+          - **Integration:** Ready for openssl-tools orchestration
+          - **Validation:** All basic checks passed
+          
+          ### Next Steps
+          - Changes can trigger openssl-tools for full build testing
+          - Complex build orchestration handled by openssl-tools repository
+          - This minimal validation ensures basic compatibility
+          EOF
+      
+      - name: Failure Summary
+        if: failure()
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+          ## ❌ Basic Validation - FAILED
+          
+          ### Issues Found
+          Basic validation failed. Common issues:
+          
+          1. **VERSION.dat Problems:**
+             - File missing or invalid format
+             - Missing MAJOR, MINOR, or PATCH fields
+          
+          2. **conanfile.py Issues:**
+             - Syntax errors in Python code
+             - Version detection not working with VERSION.dat
+             - Basic configuration failing
+          
+          3. **Repository Structure:**
+             - Missing core OpenSSL components
+             - Required workflows not configured properly
+          
+          4. **Integration Setup:**
+             - trigger-tools.yml not properly configured
+             - Missing openssl-tools repository references
+          
+          ### Required Actions
+          1. Fix the specific error shown in logs above
+          2. Ensure this is a proper OpenSSL source repository
+          3. Verify conanfile.py is compatible with OpenSSL structure
+          4. Do NOT proceed until basic validation passes
+          EOF
