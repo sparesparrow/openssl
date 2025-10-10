@@ -23,7 +23,7 @@ This document tracks the completion of Phase 1 stabilization efforts based on co
 - **Replaced** complex 933-line conanfile.py with minimal 256-line version
 - **Removed** complex orchestration logic (SBOM generation, vulnerability scanning, fuzz corpora setup)
 - **Kept** only essential options: shared, fPIC, fips, no_deprecated, enable_quic, no_asm, no_threads, openssldir, cafile, capath, enable_unit_test
-- **Deleted** conanfile-minimal.py after replacement
+- **Renamed** conanfile-minimal.py → conanfile.py (standard Conan convention)
 - **Removed** test comments from end of file
 
 **Benefits:**
@@ -106,7 +106,7 @@ This document tracks the completion of Phase 1 stabilization efforts based on co
 - `.github/workflows/basic-validation.yml` - Simplified validation
 - `scripts/validate_conanfile.py` - NEW
 - `PHASE1_STATUS.md` - NEW (this file)
-- **Deleted:** `conanfile-minimal.py`
+- **Renamed:** `conanfile-minimal.py` → `conanfile.py`
 
 ### sparesparrow/openssl-tools
 - `.github/workflows/basic-openssl-integration.yml` - NEW
