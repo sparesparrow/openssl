@@ -1,0 +1,192 @@
+name: Basic Validation - Simplified
+
+on:
+  pull_request:
+    paths:
+      - '*.py'
+      - '*.yml'
+      - '*.yaml'
+      - 'conanfile.py'
+      - 'VERSION.dat'
+      - 'Configure'
+      - 'config'
+      - '.github/workflows/**'
+      - 'conan-profiles/**'
+  push:
+    branches: [main, master, openssl-3.*]
+    paths:
+      - '*.py'
+      - '*.yml'
+      - '*.yaml'
+      - 'conanfile.py'
+      - 'VERSION.dat'
+      - 'Configure'
+      - 'config'
+      - '.github/workflows/**'
+      - 'conan-profiles/**'
+  workflow_dispatch:
+
+jobs:
+  basic-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10  # Quick validation
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install conan>=2.0
+          pip install pyyaml
+      
+      - name: Validate conanfile.py syntax
+        run: |
+          echo "🔍 Validating conanfile.py syntax..."
+          if [ ! -f "conanfile.py" ]; then
+            echo "❌ conanfile.py not found"
+            exit 1
+          fi
+          
+          python -m py_compile conanfile.py
+          if [ $? -eq 0 ]; then
+            echo "✅ conanfile.py syntax is valid"
+          else
+            echo "❌ conanfile.py syntax validation failed"
+            exit 1
+          fi
+      
+      - name: Validate YAML files
+        run: |
+          echo "🔍 Validating YAML files..."
+          python -c "
+          import yaml
+          import sys
+          import glob
+          
+          yaml_files = glob.glob('**/*.yml', recursive=True) + glob.glob('**/*.yaml', recursive=True)
+          
+          for file in yaml_files:
+              try:
+                  with open(file, 'r') as f:
+                      yaml.safe_load(f)
+                  print(f'✅ {file} is valid YAML')
+              except yaml.YAMLError as e:
+                  print(f'❌ {file} has YAML syntax error: {e}')
+                  sys.exit(1)
+          "
+      
+      - name: Validate VERSION.dat
+        run: |
+          echo "🔍 Validating VERSION.dat..."
+          if [ ! -f "VERSION.dat" ]; then
+            echo "❌ VERSION.dat not found"
+            exit 1
+          fi
+          
+          # Check for required fields
+          if ! grep -q "MAJOR=" VERSION.dat; then
+            echo "❌ VERSION.dat missing MAJOR field"
+            exit 1
+          fi
+          
+          if ! grep -q "MINOR=" VERSION.dat; then
+            echo "❌ VERSION.dat missing MINOR field"
+            exit 1
+          fi
+          
+          if ! grep -q "PATCH=" VERSION.dat; then
+            echo "❌ VERSION.dat missing PATCH field"
+            exit 1
+          fi
+          
+          echo "✅ VERSION.dat is valid"
+      
+      - name: Test conanfile.py basic functionality
+        run: |
+          echo "🔍 Testing conanfile.py basic functionality..."
+          python -c "
+          import sys
+          sys.path.append('.')
+          from conanfile import OpenSSLConan
+          
+          # Test basic instantiation
+          conan = OpenSSLConan()
+          conan.recipe_folder = '.'
+          
+          # Test version detection
+          try:
+              conan.set_version()
+              print(f'✅ Version detection works: {conan.version}')
+          except Exception as e:
+              print(f'❌ Version detection failed: {e}')
+              sys.exit(1)
+          
+          # Test that the class can be imported and basic attributes exist
+          try:
+              assert hasattr(conan, 'name')
+              assert hasattr(conan, 'version')
+              assert hasattr(conan, 'options')
+              assert hasattr(conan, 'settings')
+              print('✅ Basic class structure is valid')
+          except Exception as e:
+              print(f'❌ Class structure validation failed: {e}')
+              sys.exit(1)
+          "
+      
+      - name: Validate Conan profiles
+        run: |
+          echo "🔍 Validating Conan profiles..."
+          if [ ! -d "conan-profiles" ]; then
+            echo "❌ conan-profiles directory not found"
+            exit 1
+          fi
+          
+          for profile in conan-profiles/*.profile; do
+            if [ -f "$profile" ]; then
+              echo "Validating $profile"
+              conan profile show --profile="$profile" > /dev/null || {
+                echo "❌ Profile $profile validation failed"
+                exit 1
+              }
+            fi
+          done
+          echo "✅ All Conan profiles are valid"
+      
+      - name: Check essential files exist
+        run: |
+          echo "🔍 Checking essential files exist..."
+          required_files=(
+            "conanfile.py"
+            "VERSION.dat"
+            "Configure"
+            "config"
+          )
+          
+          for file in "${required_files[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "❌ Missing required file: $file"
+              exit 1
+            else
+              echo "✅ Found: $file"
+            fi
+          done
+          
+          echo "✅ All essential files present"
+      
+      - name: Report success
+        run: |
+          echo "🎉 Basic validation completed successfully!"
+          echo "✅ All fundamental components validated:"
+          echo "  - conanfile.py syntax valid"
+          echo "  - YAML files valid"
+          echo "  - VERSION.dat valid"
+          echo "  - Conan profiles valid"
+          echo "  - Essential files present"
+          echo ""
+          echo "🚀 Ready for openssl-tools integration!"
