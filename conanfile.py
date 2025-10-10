@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-OpenSSL Conan Package Recipe
-Production-ready Conan 2.x recipe with comprehensive OpenSSL build support
+OpenSSL Conan Package Recipe - Minimal Version
+Simplified Conan 2.x recipe focused on core OpenSSL build functionality
+Complex orchestration handled by openssl-tools repository
 """
 
 from conan import ConanFile
@@ -12,9 +13,7 @@ from conan.tools.system import package_manager
 from conan.errors import ConanInvalidConfiguration
 import os
 import re
-import hashlib
 import json
-import uuid
 
 
 class OpenSSLConan(ConanFile):
@@ -28,222 +27,55 @@ class OpenSSLConan(ConanFile):
     license = "Apache-2.0"
     topics = ("ssl", "tls", "cryptography", "security")
     
-    # Package configuration
+    # Package configuration - simplified core options only
     settings = "os", "compiler", "build_type", "arch"
     options = {
         # Core build options
         "shared": [True, False],
         "fPIC": [True, False],
         
-        # Security & Compliance
+        # Security & Compliance (essential)
         "fips": [True, False],
         "no_deprecated": [True, False],
         
-        # Features
-        "enable_demos": [True, False],
-        "enable_h3demo": [True, False],
-        "enable_sslkeylog": [True, False],
+        # Essential features
         "enable_quic": [True, False],
-        
-        # Protocol support
-        "enable_ssl3": [True, False],
-        "enable_ssl3_method": [True, False],
-        "no_dtls": [True, False],
-        "no_tls1": [True, False],
-        "no_tls1_1": [True, False],
-        
-        # Cryptographic algorithms
-        "enable_md2": [True, False],
-        "enable_md4": [True, False],
-        "enable_weak_ssl_ciphers": [True, False],
-        "enable_ec_nistp_64_gcc_128": [True, False],
-        
-        # Performance & Optimization
         "no_asm": [True, False],
         "no_threads": [True, False],
-        "no_bulk": [True, False],
         
-        # Debugging & Testing
-        "enable_crypto_mdebug": [True, False],
-        "enable_trace": [True, False],
-        "enable_asan": [True, False],
-        "enable_ubsan": [True, False],
-        "enable_msan": [True, False],
-        "enable_tsan": [True, False],
-        "enable_unit_test": [True, False],
-        "enable_external_tests": [True, False],
-        "enable_fuzzer_afl": [True, False],
-        "enable_fuzzer_libfuzzer": [True, False],
-        "enable_buildtest_c++": [True, False],
-        
-        # System integration
-        "enable_ktls": [True, False],
-        "enable_sctp": [True, False],
-        
-        # Compression
-        "enable_zlib": [True, False],
-        "enable_zlib_dynamic": [True, False],
-        "enable_zstd": [True, False],
-        "enable_brotli": [True, False],
-        
-        # Legacy & Compatibility
-        "no_legacy": [True, False],
-        "no_afalgeng": [True, False],
-        
-        # Miscellaneous
-        "enable_egd": [True, False],
-        "no_cached_fetch": [True, False],
-        
-        # Legacy options (for backward compatibility)
-        "no_zlib": [True, False],
-        "386": [True, False],
-        "no_sse2": [True, False],
-        "no_bf": [True, False],
-        "no_cast": [True, False],
-        "no_des": [True, False],
-        "no_dh": [True, False],
-        "no_dsa": [True, False],
-        "no_hmac": [True, False],
-        "no_md2": [True, False],
-        "no_md4": [True, False],
-        "no_md5": [True, False],
-        "no_mdc2": [True, False],
-        "no_rc2": [True, False],
-        "no_rc4": [True, False],
-        "no_rc5": [True, False],
-        "no_rsa": [True, False],
-        "no_sha": [True, False],
+        # Essential directories
         "openssldir": ["ANY"],
         "cafile": ["ANY"], 
         "capath": ["ANY"],
-        "no_pinshared": [True, False],
-        "no_stdio": [True, False],
-        "enable_lms": [True, False],
-        "enable_crypto_mdebug_backtrace": [True, False],
+        
+        # Build control
+        "enable_unit_test": [True, False],
     }
     
     default_options = {
-        # Core build options
         "shared": True,
         "fPIC": True,
-        
-        # Security & Compliance
         "fips": False,
         "no_deprecated": False,
-        
-        # Features
-        "enable_demos": False,
-        "enable_h3demo": False,
-        "enable_sslkeylog": False,
         "enable_quic": True,
-        
-        # Protocol support
-        "enable_ssl3": False,
-        "enable_ssl3_method": False,
-        "no_dtls": False,
-        "no_tls1": False,
-        "no_tls1_1": False,
-        
-        # Cryptographic algorithms
-        "enable_md2": False,
-        "enable_md4": False,
-        "enable_weak_ssl_ciphers": False,
-        "enable_ec_nistp_64_gcc_128": False,
-        
-        # Performance & Optimization
         "no_asm": False,
         "no_threads": False,
-        "no_bulk": False,
-        
-        # Debugging & Testing
-        "enable_crypto_mdebug": False,
-        "enable_trace": False,
-        "enable_asan": False,
-        "enable_ubsan": False,
-        "enable_msan": False,
-        "enable_tsan": False,
-        "enable_unit_test": False,
-        "enable_external_tests": False,
-        "enable_fuzzer_afl": False,
-        "enable_fuzzer_libfuzzer": False,
-        "enable_buildtest_c++": False,
-        
-        # System integration
-        "enable_ktls": False,
-        "enable_sctp": False,
-        
-        # Compression
-        "enable_zlib": False,
-        "enable_zlib_dynamic": False,
-        "enable_zstd": False,
-        "enable_brotli": False,
-        
-        # Legacy & Compatibility
-        "no_legacy": False,
-        "no_afalgeng": False,
-        
-        # Miscellaneous
-        "enable_egd": False,
-        "no_cached_fetch": False,
-        
-        # Legacy options (for backward compatibility)
-        "no_zlib": False,
-        "386": False,
-        "no_sse2": False,
-        "no_bf": False,
-        "no_cast": False,
-        "no_des": False,
-        "no_dh": False,
-        "no_dsa": False,
-        "no_hmac": False,
-        "no_md2": True,
-        "no_md4": False,
-        "no_md5": False,
-        "no_mdc2": False,
-        "no_rc2": False,
-        "no_rc4": False,
-        "no_rc5": True,
-        "no_rsa": False,
-        "no_sha": False,
         "openssldir": "/usr/local/ssl",
         "cafile": "",
         "capath": "",
-        "no_pinshared": False,
-        "no_stdio": False,
-        "enable_lms": False,
-        "enable_crypto_mdebug_backtrace": False,
+        "enable_unit_test": False,
     }
     
-    # Build requirements
     def build_requirements(self):
+        """Minimal build requirements"""
         if self.settings.os == "Windows":
             self.tool_requires("nasm/2.15.05")
             self.tool_requires("strawberryperl/5.32.0.1")
-        # Use system perl for Unix-like systems
-        # self.tool_requires("perl/5.38.0")
         
-    # Runtime requirements  
     def requirements(self):
-        if not self.options.no_zlib:
-            self.requires("zlib/1.3.1")
-        
-        if self.options.enable_zstd:
-            self.requires("zstd/1.5.5")
-            
-        if self.options.enable_brotli:
-            self.requires("brotli/1.1.0")
-        
-        # Add fuzz corpora if fuzzing is enabled
-        if (self.options.enable_fuzzer_afl or self.options.enable_fuzzer_libfuzzer or 
-            os.getenv("OSSL_RUN_CI_TESTS")):
-            self.requires("openssl-fuzz-corpora/1.0.0")
-            
-    def system_requirements(self):
-        # System package requirements for different platforms
-        package_manager.Apt(self).install(["build-essential", "perl"])
-        package_manager.Yum(self).install(["gcc", "gcc-c++", "make", "perl"])
-        package_manager.PacMan(self).install(["base-devel", "perl"])
-        package_manager.Zypper(self).install(["gcc", "gcc-c++", "make", "perl"])
+        """Minimal runtime requirements"""
+        # Only essential dependencies - complex dependency management in openssl-tools
+        pass
         
     def set_version(self):
         """Dynamically determine version from VERSION.dat"""
@@ -273,106 +105,25 @@ class OpenSSLConan(ConanFile):
             raise
                 
     def configure(self):
-        """Configure and validate build options"""
-        # Static builds don't need fPIC
+        """Basic configuration - complex logic handled by openssl-tools"""
         if not self.options.shared:
             del self.options.fPIC
             
-        # Configure build options based on settings
-        if self.settings.build_type == "Debug":
-            self.options.enable_crypto_mdebug = True
-            
-        # Security-focused builds
-        if self.options.fips:
-            self.options.enable_unit_test = True
-            
-        # Performance builds  
-        if self.settings.build_type == "Release" and self.settings.arch in ["x86_64", "armv8"]:
-            self.options.no_asm = False
-            
-        # Sanitizers require debug build
-        if self.settings.build_type != "Debug":
-            if self.options.enable_asan or self.options.enable_ubsan or \
-               self.options.enable_msan or self.options.enable_tsan:
-                self.output.warn("Sanitizers require Debug build, disabling")
-                self.options.enable_asan = False
-                self.options.enable_ubsan = False
-                self.options.enable_msan = False
-                self.options.enable_tsan = False
-    
-    def validate(self):
-        """Validate configuration options for conflicts"""
-        # Check for conflicting options
+        # Basic FIPS validation
         if self.options.fips and self.options.no_asm:
             raise ConanInvalidConfiguration(
                 "FIPS mode requires assembly optimizations. "
-                "Cannot use fips=True with no_asm=True. "
-                "Set no_asm=False or disable FIPS."
+                "Cannot use fips=True with no_asm=True."
             )
+    
+    def validate(self):
+        """Essential validation only - comprehensive validation in openssl-tools"""
+        # Only critical validations that prevent builds
+        if self.options.fips and self.options.no_asm:
+            raise ConanInvalidConfiguration("FIPS mode requires assembly optimizations")
         
-        if self.options.fips and self.settings.build_type == "Debug":
-            self.output.warning(
-                "FIPS validation may behave differently in Debug builds. "
-                "Consider using Release build_type for production FIPS deployments."
-            )
-        
-        # Sanitizers are mutually exclusive
-        sanitizers = [
-            bool(self.options.enable_asan),
-            bool(self.options.enable_msan),
-            bool(self.options.enable_tsan)
-        ]
-        if sum(sanitizers) > 1:
-            raise ConanInvalidConfiguration(
-                "Only one sanitizer can be enabled at a time. "
-                "Choose either ASAN, MSAN, or TSAN, not multiple."
-            )
-        
-        # Sanitizers don't work well with optimization
-        if any(sanitizers) and self.settings.build_type == "Release":
-            # Be stricter off Linux, where Release+sanitizers tends to be flaky
-            if self.settings.os != "Linux":
-                raise ConanInvalidConfiguration(
-                    "Sanitizers with Release build_type are not supported on this platform. "
-                    "Use build_type=Debug or disable sanitizers."
-                )
-            else:
-                self.output.warning(
-                    "Sanitizers work best with Debug builds. "
-                    "Consider using build_type=Debug for sanitizer testing."
-                )
-        
-        # Check for no_threads with QUIC (QUIC needs threading)
         if self.options.no_threads and self.options.enable_quic:
-            raise ConanInvalidConfiguration(
-                "QUIC protocol requires threading support. "
-                "Cannot use no_threads=True with enable_quic=True."
-            )
-        
-        # ASAN doesn't work well with Release optimization on Windows
-        if (self.options.enable_asan and 
-            self.settings.build_type == "Release" and 
-            self.settings.os == "Windows"):
-            raise ConanInvalidConfiguration(
-                "ASAN doesn't work well with Release optimization on Windows. "
-                "Use Debug build_type or disable ASAN for Windows Release builds."
-            )
-
-        # Cross-platform option sanity
-        if getattr(self.options, "no_sse2", False) and str(self.settings.arch) not in ["x86", "x86_64"]:
-            raise ConanInvalidConfiguration(
-                "Option no_sse2 is only meaningful on x86/x86_64 architectures."
-            )
-
-        if getattr(self.options, "386", False) and str(self.settings.arch) != "x86":
-            raise ConanInvalidConfiguration(
-                "Option 386 can only be used when arch=x86."
-            )
-
-        if self.options.enable_msan and (str(self.settings.os) != "Linux" or "clang" not in str(self.settings.compiler)):
-            raise ConanInvalidConfiguration(
-                "MSAN builds are only supported with clang on Linux."
-            )
+            raise ConanInvalidConfiguration("QUIC protocol requires threading support")
             
     def export_sources(self):
         """Export full source tree for reproducible builds"""

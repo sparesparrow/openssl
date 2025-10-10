@@ -6,20 +6,26 @@ on:
       - '*.py'
       - '*.yml'
       - '*.yaml'
-      - 'conanfile.py'
+      - 'conanfile*.py'
       - 'VERSION.dat'
+      - 'Configure'
+      - 'config'
       - '.github/workflows/**'
       - 'conan-profiles/**'
+      - 'test_package/**'
   push:
     branches: [main, master, openssl-3.*]
     paths:
       - '*.py'
       - '*.yml'
       - '*.yaml'
-      - 'conanfile.py'
+      - 'conanfile*.py'
       - 'VERSION.dat'
+      - 'Configure'
+      - 'config'
       - '.github/workflows/**'
       - 'conan-profiles/**'
+      - 'test_package/**'
   workflow_dispatch:
 
 jobs:
@@ -42,8 +48,19 @@ jobs:
       
       - name: Validate conanfile.py syntax
         run: |
+          echo "🔍 Validating conanfile.py syntax..."
+          if [ ! -f "conanfile.py" ]; then
+            echo "❌ conanfile.py not found"
+            exit 1
+          fi
+          
           python -m py_compile conanfile.py
-          echo "✅ conanfile.py syntax is valid"
+          if [ $? -eq 0 ]; then
+            echo "✅ conanfile.py syntax is valid"
+          else
+            echo "❌ conanfile.py syntax validation failed"
+            exit 1
+          fi
       
       - name: Validate YAML files
         run: |
@@ -243,13 +260,14 @@ jobs:
             "scripts/conan/conan_orchestrator.py"
             "scripts/ci/conan_automation.py"
             "conan-dev/"
-            "conan-profiles/"  # This should be conan-profiles/ not conan-profiles/
+            "scripts/openssl_conan/"
+            "openssl-tools-workflows/"
           )
           
           for path in "${forbidden_paths[@]}"; do
             if [ -e "$path" ]; then
               echo "⚠️  Found orchestration file that should be in openssl-tools: $path"
-              # Don't fail yet - this is during migration
+              echo "   Migration status: Some files may still be present during transition"
             fi
           done
           
