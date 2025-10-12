@@ -2,9 +2,9 @@ name: OpenSSL CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop, feature/* ]
+    branches: [ master, main, develop, feature/* ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ master, main, develop ]
   schedule:
     # Run daily at 2 AM UTC for security scans
     - cron: '0 2 * * *'
@@ -330,7 +330,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [package, security-scan]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    environment: production
+    environment: python-conan-env
     
     steps:
       - name: Checkout code

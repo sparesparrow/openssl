@@ -119,7 +119,7 @@ jobs:
       - name: Set up Artifactory
         run: |
           conan remote add artifactory ${{ secrets.ARTIFACTORY_URL }}
-          conan user -p ${{ secrets.ARTIFACTORY_PASSWORD }} -r artifactory ${{ secrets.ARTIFACTORY_USERNAME }}
+          conan user -p ${{ secrets.ARTIFACTORY_URL }} -r artifactory ${{ secrets.ARTIFACTORY_USERNAME }}
       
       - name: Build OpenSSL Package
         run: |
