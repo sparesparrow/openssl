@@ -155,7 +155,7 @@ The OpenSSL Conan package integrates with the [openssl-tools](https://github.com
 conan remote add artifactory https://your-artifactory.com/artifactory/api/conan/conan
 
 # Configure authentication
-conan user -p $ARTIFACTORY_PASSWORD -r artifactory $ARTIFACTORY_USERNAME
+conan user -p $ARTIFACTORY_URL -r artifactory $ARTIFACTORY_USERNAME
 
 # Upload packages
 conan upload "openssl/*" -r=artifactory --all --confirm
@@ -167,7 +167,7 @@ conan upload "openssl/*" -r=artifactory --all --confirm
 # Required for Artifactory integration
 export ARTIFACTORY_URL="https://your-artifactory.com"
 export ARTIFACTORY_USERNAME="your-username"
-export ARTIFACTORY_PASSWORD="your-password"
+export ARTIFACTORY_URL="your-password"
 
 # Optional: Package signing
 export CONAN_SIGN_PACKAGES="true"

@@ -1,14 +1,36 @@
+# OpenSSL Repository
+
+This repository contains the core OpenSSL library implementation.
+
+## Repository Cooperation
+
+This repository works with [openssl-tools](https://github.com/sparesparrow/openssl-tools) for:
+- Advanced CI/CD orchestration
+- Conan package management
+- Build optimization and caching
+- Artifact distribution
+
+## Development Workflow
+
+1. Make changes to OpenSSL source code
+2. Push changes (triggers core validation)
+3. Core validation triggers openssl-tools CI
+4. Packages built and distributed via openssl-tools
+
+## Minimal Dependencies
+
+- `conanfile.py` - Basic package definition
+- `conan/default.profile` - Basic build profile
+- Core CI workflows for validation and triggering
+
+---
+
+*This is a fork of the official [OpenSSL project](https://github.com/openssl/openssl) with minimal changes to support Conan packaging.*
+
 Welcome to the OpenSSL Project
 ==============================
 
 [![openssl logo]][www.openssl.org]
-
-[![github actions ci badge]][github actions ci]
-[![Nightly OS Zoo ci badge](https://github.com/openssl/openssl/actions/workflows/os-zoo.yml/badge.svg)](https://github.com/openssl/openssl/actions/workflows/os-zoo.yml)
-[![Provider Compatibility](https://github.com/openssl/openssl/actions/workflows/provider-compatibility.yml/badge.svg)](https://github.com/openssl/openssl/actions/workflows/provider-compatibility.yml)
-[![Quic Interop](https://github.com/openssl/openssl/actions/workflows/run_quic_interop.yml/badge.svg)](https://github.com/openssl/openssl/actions/workflows/run_quic_interop.yml)
-[![Daily checks](https://github.com/openssl/openssl/actions/workflows/run-checker-daily.yml/badge.svg)](https://github.com/openssl/openssl/actions/workflows/run-checker-daily.yml)
-[![LFX Health Score](https://insights.linuxfoundation.org/api/badge/health-score?project=openssl)](https://insights.linuxfoundation.org/project/openssl)
 
 OpenSSL is a robust, commercial-grade, full-featured Open Source Toolkit
 for the TLS (formerly SSL), DTLS and QUIC protocols.
@@ -261,3 +283,5 @@ All rights reserved.
 [appveyor jobs]:
     <https://ci.appveyor.com/project/openssl/openssl/branch/master>
     "AppVeyor Jobs"
+# Test trigger - Fri Oct 10 02:51:19 AM CEST 2025
+# Test dispatch token
