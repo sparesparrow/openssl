@@ -1,0 +1,20 @@
+build:
+  schema_version: '1.0'
+  max_jobs: 4
+  enable_ccache: true
+  enable_sccache: false
+  optimize_build: true
+  reproducible_builds: true
+  parallel_download: true
+  download_threads: -1  # -1 means use CPU count
+  build_type: Release
+  compiler:
+    gcc:
+      version: "11"
+      libcxx: "libstdc++11"
+    clang:
+      version: "14"
+      libcxx: "libstdc++11"
+    msvc:
+      version: "193"
+      runtime: "dynamic"

@@ -190,3 +190,144 @@ flowchart TD
 ```
 
 
+```mermaid
+flowchart TD
+  %% Component Development Workflow
+  subgraph Component_Development["Component Development Workflow"]
+    setup_environment["Setup Environment<br/>(Initialize development environment)"]
+    code_development["Code Development<br/>(Write and test component code)"]
+    integration_testing["Integration Testing<br/>(Test component integration)"]
+    quality_assurance["Quality Assurance<br/>(Ensure code quality and security)"]
+    package_preparation["Package Preparation<br/>(Prepare component for distribution)"]
+    distribution["Distribution<br/>(Distribute component to registries)"]
+
+    setup_environment --> code_development
+    code_development --> integration_testing
+    integration_testing --> quality_assurance
+    quality_assurance --> package_preparation
+    package_preparation --> distribution
+
+    %% Steps and actions (listed for clarity)
+    setup_environment_a1["load_environment_variables"]
+    setup_environment_a2["validate_dependencies"]
+    setup_environment_a3["start_database_container"]
+    setup_environment_a4["verify_conan_configuration"]
+    setup_environment --> setup_environment_a1 & setup_environment_a2 & setup_environment_a3 & setup_environment_a4
+
+    code_development_a1["create_component_structure"]
+    code_development_a2["implement_core_functionality"]
+    code_development_a3["write_unit_tests"]
+    code_development_a4["run_security_analysis"]
+    code_development_a5["validate_performance"]
+    code_development --> code_development_a1 & code_development_a2 & code_development_a3 & code_development_a4 & code_development_a5
+
+    integration_testing_a1["build_component"]
+    integration_testing_a2["run_integration_tests"]
+    integration_testing_a3["validate_dependencies"]
+    integration_testing_a4["check_api_compatibility"]
+    integration_testing --> integration_testing_a1 & integration_testing_a2 & integration_testing_a3 & integration_testing_a4
+
+    quality_assurance_a1["run_static_analysis"]
+    quality_assurance_a2["perform_security_scan"]
+    quality_assurance_a3["validate_documentation"]
+    quality_assurance_a4["check_code_coverage"]
+    quality_assurance --> quality_assurance_a1 & quality_assurance_a2 & quality_assurance_a3 & quality_assurance_a4
+
+    package_preparation_a1["create_conan_package"]
+    package_preparation_a2["generate_metadata"]
+    package_preparation_a3["create_sbom"]
+    package_preparation_a4["sign_artifacts"]
+    package_preparation --> package_preparation_a1 & package_preparation_a2 & package_preparation_a3 & package_preparation_a4
+
+    distribution_a1["upload_to_artifactory"]
+    distribution_a2["upload_to_github_packages"]
+    distribution_a3["update_database_records"]
+    distribution_a4["generate_release_notes"]
+    distribution --> distribution_a1 & distribution_a2 & distribution_a3 & distribution_a4
+
+  end
+
+  %% Security Review Workflow
+  subgraph Security_Review_Workflow["Security Review Workflow"]
+    automated_scanning["Automated Scanning"]
+    manual_review["Manual Review"]
+    penetration_testing["Penetration Testing"]
+    documentation_review["Documentation Review"]
+
+    automated_scanning --> manual_review
+    manual_review --> penetration_testing
+    penetration_testing --> documentation_review
+
+    automated_scanning_a1["run_sast_tools"]
+    automated_scanning_a2["check_dependency_vulnerabilities"]
+    automated_scanning_a3["analyze_cryptographic_implementations"]
+    automated_scanning_a4["validate_input_sanitization"]
+    automated_scanning --> automated_scanning_a1 & automated_scanning_a2 & automated_scanning_a3 & automated_scanning_a4
+
+    manual_review_a1["review_security_sensitive_code"]
+    manual_review_a2["validate_threat_model"]
+    manual_review_a3["check_compliance_requirements"]
+    manual_review_a4["assess_attack_surface"]
+    manual_review --> manual_review_a1 & manual_review_a2 & manual_review_a3 & manual_review_a4
+
+    penetration_testing_a1["run_automated_security_tests"]
+    penetration_testing_a2["perform_fuzzing"]
+    penetration_testing_a3["test_side_channel_resistance"]
+    penetration_testing_a4["validate_cryptographic_correctness"]
+    penetration_testing --> penetration_testing_a1 & penetration_testing_a2 & penetration_testing_a3 & penetration_testing_a4
+
+    documentation_review_a1["review_security_documentation"]
+    documentation_review_a2["validate_usage_guidelines"]
+    documentation_review_a3["check_vulnerability_disclosure_process"]
+    documentation_review_a4["update_security_policies"]
+    documentation_review --> documentation_review_a1 & documentation_review_a2 & documentation_review_a3 & documentation_review_a4
+
+  end
+
+  %% Performance Optimization Workflow
+  subgraph Performance_Optimization_Workflow["Performance Optimization Workflow"]
+    baseline_measurement["Baseline Measurement"]
+    optimization_implementation["Optimization Implementation"]
+    validation["Validation"]
+
+    baseline_measurement --> optimization_implementation
+    optimization_implementation --> validation
+
+    baseline_a1["run_performance_benchmarks"]
+    baseline_a2["profile_cpu_usage"]
+    baseline_a3["analyze_memory_consumption"]
+    baseline_a4["measure_build_times"]
+    baseline_measurement --> baseline_a1 & baseline_a2 & baseline_a3 & baseline_a4
+
+    optimization_a1["identify_bottlenecks"]
+    optimization_a2["implement_optimizations"]
+    optimization_a3["validate_correctness"]
+    optimization_a4["measure_improvements"]
+    optimization_implementation --> optimization_a1 & optimization_a2 & optimization_a3 & optimization_a4
+
+    validation_a1["run_regression_tests"]
+    validation_a2["verify_security_not_compromised"]
+    validation_a3["validate_api_compatibility"]
+    validation_a4["confirm_performance_gains"]
+    validation --> validation_a1 & validation_a2 & validation_a3 & validation_a4
+
+  end
+
+  %% Automation Rules
+  subgraph Automation_Rules["Automation Rules"]
+    pr_created["pull_request_created"]
+    commit_pushed["commit_pushed_to_main"]
+    perf_regression["performance_regression_detected"]
+    pr_condition["files_changed_match_pattern('*/crypto/*,*/ssl/*')"]
+    commit_condition["build_status_successful"]
+    perf_priority["priority=high"]
+
+    pr_created -.->|pr_condition| Security_Review_Workflow
+    commit_pushed -.->|commit_condition| Component_Development
+    perf_regression -.->|perf_priority| Performance_Optimization_Workflow
+  end
+```
+# Legend:
+# - Solid arrows: typical workflow/step order
+# - Dashed arrows: automation triggers workflows under given conditions
+

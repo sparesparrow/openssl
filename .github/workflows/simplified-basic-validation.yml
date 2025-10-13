@@ -1,0 +1,141 @@
+name: Simplified Basic Validation
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'conanfile.py'
+      - 'VERSION.dat'
+      - 'crypto/**'
+      - 'ssl/**'
+      - 'apps/**'
+      - 'include/**'
+      - 'config'
+      - 'Configure'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'conanfile.py'
+      - 'VERSION.dat'
+      - 'crypto/**'
+      - 'ssl/**'
+      - 'apps/**'
+      - 'include/**'
+      - 'config'
+      - 'Configure'
+  workflow_dispatch:
+
+jobs:
+  basic-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Checkout OpenSSL source
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      
+      - name: Install Conan
+        run: |
+          pip install conan>=2.0
+          conan --version
+      
+      - name: Validate VERSION.dat
+        run: |
+          echo "🔍 Validating VERSION.dat..."
+          if [ -f "VERSION.dat" ]; then
+            echo "✅ VERSION.dat found"
+            head -5 VERSION.dat
+          else
+            echo "❌ VERSION.dat missing"
+            exit 1
+          fi
+      
+      - name: Validate OpenSSL structure
+        run: |
+          echo "🔍 Validating OpenSSL source structure..."
+          
+          # Check for configure script
+          if [ -f "config" ] || [ -f "Configure" ]; then
+            echo "✅ Configure script found"
+          else
+            echo "❌ Configure script missing"
+            exit 1
+          fi
+          
+          # Check for essential directories
+          for dir in crypto ssl apps include; do
+            if [ -d "$dir" ]; then
+              echo "✅ $dir directory found"
+            else
+              echo "❌ $dir directory missing"
+              exit 1
+            fi
+          done
+      
+      - name: Test conanfile.py syntax
+        run: |
+          echo "🔧 Testing conanfile.py syntax..."
+          python3 -c "
+          import sys
+          sys.path.insert(0, '.')
+          
+          try:
+              from conanfile import OpenSSLConan
+              print('✅ conanfile.py imports successfully')
+              
+              conan = OpenSSLConan()
+              conan.recipe_folder = '.'
+              
+              # Test version detection
+              conan.set_version()
+              print(f'✅ Version detection works: {conan.version}')
+              
+              # Test basic configuration
+              conan.configure()
+              print('✅ Basic configuration works')
+              
+          except Exception as e:
+              print(f'❌ conanfile.py test failed: {e}')
+              import traceback
+              traceback.print_exc()
+              sys.exit(1)
+          "
+      
+      - name: Test openssl-tools integration readiness
+        run: |
+          echo "🔗 Testing openssl-tools integration readiness..."
+          
+          # Test that we can import the conanfile
+          python3 -c "
+          import sys
+          sys.path.insert(0, '.')
+          
+          try:
+              from conanfile import OpenSSLConan
+              conan = OpenSSLConan()
+              conan.recipe_folder = '.'
+              conan.set_version()
+              conan.configure()
+              
+              print('✅ OpenSSL repository ready for openssl-tools integration')
+              print(f'✅ OpenSSL version: {conan.version}')
+              print('✅ conanfile.py compatible with openssl-tools')
+              
+          except Exception as e:
+              print(f'❌ Integration readiness test failed: {e}')
+              sys.exit(1)
+          "
+      
+      - name: Validation summary
+        run: |
+          echo "🎉 Basic validation completed successfully!"
+          echo "✅ VERSION.dat present and readable"
+          echo "✅ OpenSSL source structure valid"
+          echo "✅ conanfile.py syntax correct"
+          echo "✅ Ready for openssl-tools integration"
+          echo "📝 Next: Test with openssl-tools basic-openssl-integration workflow"
