@@ -2,7 +2,7 @@ name: OpenSSL CI/CD Pipeline
 
 on:
   push:
-    branches: [ master, main, develop, feature/* ]
+    branches: [ master, main, develop, feature/*, test-cache-artifacts ]
   pull_request:
     branches: [ master, main, develop ]
   schedule:

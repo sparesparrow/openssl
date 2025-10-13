@@ -1,0 +1,103 @@
+name: Test Artifact Caching
+
+on:
+  push:
+    branches: [test-cache-artifacts]
+  workflow_dispatch:
+    inputs:
+      test_run:
+        description: 'Test run identifier'
+        required: false
+        default: '1'
+
+env:
+  CONAN_USER_HOME: ${{ github.workspace }}/.conan2
+  CONAN_COLOR_DISPLAY: 1
+
+jobs:
+  test-caching:
+    name: Test Conan Caching
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential perl
+
+      - name: Install Conan
+        run: |
+          pip install conan>=2.0
+          conan --version
+
+      - name: Configure Conan profile
+        run: |
+          conan profile detect --force
+
+      - name: Cache Conan packages
+        uses: actions/cache@v4
+        id: conan-cache
+        with:
+          path: ${{ env.CONAN_USER_HOME }}
+          key: conan-test-${{ runner.os }}-${{ hashFiles('conanfile.py') }}-${{ github.event.inputs.test_run }}
+          restore-keys: |
+            conan-test-${{ runner.os }}-
+
+      - name: Build OpenSSL with Conan
+        run: |
+          echo "🏗️ Building OpenSSL..."
+          conan create . --build=missing -o shared=False -o fips=False -tf ""
+
+      - name: Verify cache status
+        run: |
+          if [ "${{ steps.conan-cache.outputs.cache-hit }}" == "true" ]; then
+            echo "✅ Cache hit - artifacts were reused"
+            echo "cache_reused=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Cache miss - artifacts were built fresh"
+            echo "cache_reused=false" >> $GITHUB_OUTPUT
+          fi
+        id: cache-check
+
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: openssl-test-build-${{ github.run_id }}
+          path: |
+            ${{ env.CONAN_USER_HOME }}/p/*/p/
+          retention-days: 7
+
+      - name: Test summary
+        run: |
+          echo "## 🧪 Artifact Caching Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Test Run:** ${{ github.event.inputs.test_run }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Workflow:** ${{ github.workflow }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Run ID:** ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.cache-check.outputs.cache_reused }}" == "true" ]; then
+            echo "✅ **Cache Status:** HIT - Artifacts successfully reused" >> $GITHUB_STEP_SUMMARY
+            echo "📦 Cached artifacts were restored and used for this build" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Cache Status:** MISS - Fresh build performed" >> $GITHUB_STEP_SUMMARY
+            echo "🔨 Build artifacts were created and cached for future runs" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Cache Key Details:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Primary Key:** conan-test-${{ runner.os }}-${{ hashFiles('conanfile.py') }}-${{ github.event.inputs.test_run }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Restore Keys:** conan-test-${{ runner.os }}-" >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Conan Package Info:" >> $GITHUB_STEP_SUMMARY
+          conan list "openssl/*" --format=compact >> $GITHUB_STEP_SUMMARY || echo "No packages found" >> $GITHUB_STEP_SUMMARY
