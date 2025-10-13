@@ -22,9 +22,9 @@ jobs:
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
-      openssl-changed: ${{ steps.changes.outputs.openssl }}
-      conan-changed: ${{ steps.changes.outputs.conan }}
-      tests-changed: ${{ steps.changes.outputs.tests }}
+      openssl-changed: ${{ steps.changes.outputs.changes.openssl }}
+      conan-changed: ${{ steps.changes.outputs.changes.conan }}
+      tests-changed: ${{ steps.changes.outputs.changes.tests }}
     steps:
       - uses: actions/checkout@v4
       - name: Detect changes
@@ -50,7 +50,7 @@ jobs:
 
   compile-changes:
     needs: detect-changes
-    if: needs.detect-changes.outputs.openssl == 'true' || needs.detect-changes.outputs.conan == 'true'
+    if: needs.detect-changes.outputs.openssl-changed == 'true' || needs.detect-changes.outputs.conan-changed == 'true'
     runs-on: ${{ matrix.os }}
     env:
       CONAN_USER_HOME: ${{ github.workspace }}/.conan2
@@ -59,7 +59,7 @@ jobs:
       CLICOLOR: 1
       ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
       ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
-      ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
+      ARTIFACTORY_TOKEN: ${{ secrets.ARTIFACTORY_TOKEN }}
     strategy:
       fail-fast: false
       matrix:
@@ -175,7 +175,7 @@ jobs:
         if: env.ARTIFACTORY_URL != ''
         run: |
           conan remote add artifactory ${{ env.ARTIFACTORY_URL }}/conan-local
-          conan user -p ${{ secrets.ARTIFACTORY_PASSWORD }} -r artifactory ${{ secrets.ARTIFACTORY_USERNAME }}
+          conan user -p ${{ secrets.ARTIFACTORY_URL }} -r artifactory ${{ secrets.ARTIFACTORY_USERNAME }}
           conan upload "openssl/*" -r=artifactory --all --confirm || true
       
       - name: Upload packages to GitHub Packages

@@ -1,0 +1,48 @@
+name: Release Build
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  trigger-release-build:
+    name: Trigger Release Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Get commit info
+        id: commit-info
+        run: |
+          echo "sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+          echo "ref=${{ github.ref }}" >> $GITHUB_OUTPUT
+          echo "author=${{ github.actor }}" >> $GITHUB_OUTPUT
+          echo "message=$(git log -1 --pretty=format:'%s')" >> $GITHUB_OUTPUT
+          
+      - name: Trigger openssl-tools release build
+        run: |
+          echo "Triggering release build in openssl-tools repository..."
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.DISPATCH_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/sparesparrow/openssl-tools/dispatches \
+            -d '{
+              "event_type": "master-merge",
+              "client_payload": {
+                "sha": "${{ steps.commit-info.outputs.sha }}",
+                "ref": "${{ steps.commit-info.outputs.ref }}",
+                "author": "${{ steps.commit-info.outputs.author }}",
+                "message": "${{ steps.commit-info.outputs.message }}",
+                "repository": "${{ github.repository }}",
+                "pusher": "${{ github.actor }}"
+              }
+            }'
+            
+      - name: Report trigger status
+        run: |
+          echo "✅ Release build triggered successfully"
+          echo "Check openssl-tools repository for build progress"
