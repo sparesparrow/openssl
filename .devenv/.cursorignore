@@ -1,0 +1,82 @@
+# Build artifacts - exclude from indexing
+build/
+**/build/
+*.o
+*.so
+*.dylib
+*.a
+*.exe
+*.dll
+compile_commands.json
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+CTestTestfile.cmake
+
+# Test corpora - large binary files
+test/fuzz-corpora/
+fuzz-corpora/
+*.corpus
+*.crash
+
+# Generated documentation
+docs/html/
+docs/man/
+**/doxygen/
+
+# Conan cache and artifacts
+.conan/
+conan_cache/
+conan_toolchain.cmake
+graph_info.json
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Package archives
+*.tar.gz
+*.zip
+*.deb
+*.rpm
+
+# Temporary files
+*.tmp
+*.bak
+*.orig
+
+# Log files
+*.log
+logs/
+
+# Coverage reports
+*.gcda
+*.gcno
+coverage/
+*.profraw
+*.profdata
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Node modules (if any)
+node_modules/
+
+# Vendor directories
+vendor/
+third_party/
+
+# Backup files
+*.backup
+*~

@@ -1,0 +1,47 @@
+{
+  "mcpServers": {
+    "openssl-orchestrator": {
+      "command": "python",
+      "args": [
+        "-m",
+        "mcp_project_orchestrator",
+        "--workspace",
+        "${workspaceFolder}"
+      ],
+      "cwd": "${workspaceFolder:../mcp-project-orchestrator}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder:../mcp-project-orchestrator}/src",
+        "OPENSSL_ROOT": "${workspaceFolder}",
+        "OPENSSL_CONAN_BASE": "${workspaceFolder:../openssl-conan-base}",
+        "CONAN_USER_HOME": "${workspaceFolder}/.conan"
+      }
+    },
+    "conan-package-manager": {
+      "command": "conan",
+      "args": ["server", "--mcp"],
+      "env": {
+        "CONAN_USER_HOME": "${workspaceFolder}/.conan"
+      }
+    },
+    "fips-validator": {
+      "command": "python",
+      "args": [
+        "-c",
+        "import sys; sys.path.append('${workspaceFolder:../mcp-project-orchestrator}/src'); from mcp_project_orchestrator.fips_validator import FIPSValidator; FIPSValidator().serve_mcp()"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "OPENSSL_CONF": "${workspaceFolder}/providers/fipsmodule.cnf",
+        "OPENSSL_MODULES": "${workspaceFolder}/build/providers"
+      }
+    },
+    "github-integration": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${env:GITHUB_TOKEN}",
+        "GITHUB_REPOSITORY": "openssl/openssl"
+      }
+    }
+  }
+}
