@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-C++ Project Conan Package Recipe
-Based on ngapy-dev patterns for C++ development with Conan 2.x integration
+OpenSSL FIPS Conan Package Recipe
+Based on ngapy-dev patterns for C development with FIPS compliance
 """
 
 from conan import ConanFile
@@ -18,134 +18,176 @@ import uuid
 from pathlib import Path
 
 
-class CppProjectConan(ConanFile):
-    name = "project-name"  # Change this to your project name
-    version = "1.0.0"      # Change this to your project version
-    
+class OpenSSLConan(ConanFile):
+    name = "openssl"
+    version = "3.3.0"
+
     # Package metadata
-    description = "C++ project description"
-    homepage = "https://github.com/your-org/project-name"
-    url = "https://github.com/your-org/project-name"
+    description = "OpenSSL FIPS 140-3 compliant cryptographic library"
+    homepage = "https://www.openssl.org"
+    url = "https://github.com/openssl/openssl"
     license = "Apache-2.0"
-    topics = ("cpp", "project", "template")
-    
+    topics = ("openssl", "crypto", "fips", "security", "ssl", "tls")
+
     # Package configuration
     settings = "os", "compiler", "build_type", "arch"
     options = {
         "shared": [True, False],
         "fPIC": [True, False],
+        "enable_fips": [True, False],
         "enable_tests": [True, False],
-        "enable_examples": [True, False],
         "enable_docs": [True, False],
+        "enable_examples": [True, False],
+        "no_ssl3": [True, False],
+        "no_tls1": [True, False],
+        "no_tls1_1": [True, False],
+        "no_deprecated": [True, False],
+        "no_engine": [True, False],
     }
-    
+
     default_options = {
-        "shared": False,
+        "shared": True,
         "fPIC": True,
+        "enable_fips": True,
         "enable_tests": True,
-        "enable_examples": False,
         "enable_docs": False,
+        "enable_examples": False,
+        "no_ssl3": True,
+        "no_tls1": True,
+        "no_tls1_1": True,
+        "no_deprecated": False,
+        "no_engine": True,
     }
-    
+
     # Build requirements
     def build_requirements(self):
         if self.options.enable_tests:
             self.tool_requires("gtest/1.14.0")
         if self.options.enable_docs:
             self.tool_requires("doxygen/1.9.8")
-    
+
     # Runtime requirements
     def requirements(self):
-        # Add your project dependencies here
-        # self.requires("boost/1.82.0")
-        # self.requires("fmt/10.1.1")
-        pass
-    
+        if self.options.enable_fips:
+            self.requires("openssl-fips-policy/3.3.0")
+
     def system_requirements(self):
-        # System package requirements for different platforms
-        package_manager.Apt(self).install(["build-essential", "cmake", "git"])
-        package_manager.Yum(self).install(["gcc", "gcc-c++", "make", "cmake", "git"])
-        package_manager.PacMan(self).install(["base-devel", "cmake", "git"])
-        package_manager.Zypper(self).install(["gcc", "gcc-c++", "make", "cmake", "git"])
-    
+        """System requirements for OpenSSL build"""
+        package_manager.Apt(self).install([
+            "build-essential", "cmake", "git", "perl", "libperl-dev"
+        ])
+        package_manager.Yum(self).install([
+            "gcc", "gcc-c++", "make", "cmake", "git", "perl", "perl-devel"
+        ])
+        package_manager.PacMan(self).install([
+            "base-devel", "cmake", "git", "perl"
+        ])
+        package_manager.Zypper(self).install([
+            "gcc", "gcc-c++", "make", "cmake", "git", "perl", "perl-devel"
+        ])
+
     def set_version(self):
-        """Set version from git or default - following ngapy patterns"""
+        """Set version from git tags or VERSION.dat"""
         try:
             git = Git(self)
-            # Get version from git describe or use default
             version = git.run("describe --tags --always --dirty")
             if version:
-                # Clean up version string
                 version = version.strip().replace("v", "")
                 self.version = version
             else:
-                self.version = "1.0.0"
+                # Fallback to VERSION.dat
+                version_file = os.path.join(self.source_folder, "VERSION.dat")
+                if os.path.exists(version_file):
+                    with open(version_file, 'r') as f:
+                        version_data = f.read().strip()
+                        # Parse VERSION.dat format
+                        self.version = version_data.split()[0]
         except:
-            self.version = "1.0.0"
-    
+            self.version = "3.3.0"
+
     def configure(self):
         """Configure package options"""
-        # Static builds don't need fPIC
+        if self.options.enable_fips and not self.options.no_deprecated:
+            self.output.warn("FIPS mode enabled with deprecated algorithms - consider setting no_deprecated=True")
+
+        # Static builds need fPIC
         if not self.options.shared:
-            del self.options.fPIC
-    
+            self.options.fPIC = True
+
     def validate(self):
         """Validate configuration"""
-        # Add your validation logic here
-        pass
-    
+        if self.options.enable_fips and self.settings.compiler == "gcc":
+            if self.settings.compiler.version < "7":
+                raise ConanInvalidConfiguration("FIPS mode requires GCC 7+")
+
+        if self.options.enable_fips and self.options.no_deprecated:
+            self.output.info("FIPS mode with no deprecated algorithms - maximum security")
+
     def export_sources(self):
         """Export source files"""
-        copy(self, "*", src=self.recipe_folder, dst=self.export_sources_folder)
-    
+        copy(self, "*", src=self.source_folder, dst=self.export_sources_folder)
+
     def layout(self):
         """Define build layout"""
         cmake_layout(self)
-    
+
     def generate(self):
         """Generate build configuration"""
         deps = CMakeDeps(self)
         deps.generate()
-        
+
         tc = CMakeToolchain(self)
+        tc.variables["OPENSSL_FIPS"] = self.options.enable_fips
         tc.variables["ENABLE_TESTS"] = self.options.enable_tests
         tc.variables["ENABLE_EXAMPLES"] = self.options.enable_examples
         tc.variables["ENABLE_DOCS"] = self.options.enable_docs
+        tc.variables["OPENSSL_NO_SSL3"] = self.options.no_ssl3
+        tc.variables["OPENSSL_NO_TLS1"] = self.options.no_tls1
+        tc.variables["OPENSSL_NO_TLS1_1"] = self.options.no_tls1_1
+        tc.variables["OPENSSL_NO_DEPRECATED"] = self.options.no_deprecated
+        tc.variables["OPENSSL_NO_ENGINE"] = self.options.no_engine
         tc.generate()
-    
+
     def build(self):
-        """Build the package"""
+        """Build OpenSSL"""
         cmake = CMake(self)
         cmake.configure()
         cmake.build()
-        
+
         # Run tests if enabled
         if self.options.enable_tests:
             cmake.test()
-    
+
     def package(self):
-        """Package the built artifacts"""
+        """Package OpenSSL"""
         # Copy headers
-        copy(self, "*.h", src=self.source_folder, dst=os.path.join(self.package_folder, "include"))
-        copy(self, "*.hpp", src=self.source_folder, dst=os.path.join(self.package_folder, "include"))
-        
+        copy(self, "*.h", src=os.path.join(self.source_folder, "include"),
+             dst=os.path.join(self.package_folder, "include"))
+        copy(self, "*.h", src=self.build_folder,
+             dst=os.path.join(self.package_folder, "include"))
+
         # Copy libraries
         copy(self, "*.lib", src=self.build_folder, dst=os.path.join(self.package_folder, "lib"), keep_path=False)
         copy(self, "*.a", src=self.build_folder, dst=os.path.join(self.package_folder, "lib"), keep_path=False)
         copy(self, "*.so*", src=self.build_folder, dst=os.path.join(self.package_folder, "lib"), keep_path=False)
         copy(self, "*.dylib", src=self.build_folder, dst=os.path.join(self.package_folder, "lib"), keep_path=False)
         copy(self, "*.dll", src=self.build_folder, dst=os.path.join(self.package_folder, "bin"), keep_path=False)
-        
+
         # Copy executables
-        copy(self, "*.exe", src=self.build_folder, dst=os.path.join(self.package_folder, "bin"), keep_path=False)
-        copy(self, "*", src=self.build_folder, dst=os.path.join(self.package_folder, "bin"), keep_path=False, excludes="*.o")
-        
-        # Copy license
+        copy(self, "openssl*", src=self.build_folder, dst=os.path.join(self.package_folder, "bin"), keep_path=False)
+
+        # Copy FIPS module if built
+        if self.options.enable_fips:
+            copy(self, "fips.so", src=self.build_folder, dst=os.path.join(self.package_folder, "lib/ossl-modules"), keep_path=False)
+            copy(self, "fips.dll", src=self.build_folder, dst=os.path.join(self.package_folder, "bin"), keep_path=False)
+
+        # Copy license and docs
         copy(self, "LICENSE*", src=self.source_folder, dst=os.path.join(self.package_folder, "licenses"))
-        
-        # Generate SBOM
+        copy(self, "CHANGES*", src=self.source_folder, dst=os.path.join(self.package_folder, "licenses"))
+
+        # Generate SBOM for security compliance
         self._generate_sbom()
-    
+
     def _calculate_file_hash(self, filepath, algorithm='sha256'):
         """Calculate cryptographic hash of a file"""
         hash_func = getattr(hashlib, algorithm)()
@@ -157,16 +199,15 @@ class CppProjectConan(ConanFile):
         except Exception as e:
             self.output.warning(f"Failed to calculate hash for {filepath}: {e}")
             return None
-    
+
     def _generate_sbom(self):
-        """Generate Software Bill of Materials following ngapy patterns"""
+        """Generate Software Bill of Materials for security compliance"""
         self.output.info("Generating Software Bill of Materials (SBOM)...")
-        
-        # Calculate hashes for main files
+
         file_hashes = {}
         for root, dirs, files in os.walk(self.package_folder):
             for file in files:
-                if file.endswith(('.h', '.hpp', '.cpp', '.c', '.lib', '.a', '.so', '.dll', '.exe')):
+                if file.endswith(('.h', '.c', '.lib', '.a', '.so', '.dll', '.exe')):
                     file_path = os.path.join(root, file)
                     sha256 = self._calculate_file_hash(file_path, 'sha256')
                     if sha256:
@@ -175,17 +216,17 @@ class CppProjectConan(ConanFile):
                             "sha256": sha256,
                             "algorithm": "SHA-256"
                         }
-        
-        # Enhanced metadata collection - pattern from ngapy-dev
+
         build_metadata = {
             "build_timestamp": os.environ.get("SOURCE_DATE_EPOCH", ""),
             "build_platform": f"{self.settings.os}-{self.settings.arch}",
             "compiler": f"{self.settings.compiler}-{self.settings.compiler.version}",
             "build_type": str(self.settings.build_type),
+            "fips_enabled": self.options.enable_fips,
             "conan_version": "2.0",
-            "build_options": {k: str(v) for k, v in self.options.items()}
+            "openssl_version": self.version
         }
-        
+
         sbom_data = {
             "bomFormat": "CycloneDX",
             "specVersion": "1.5",
@@ -200,120 +241,65 @@ class CppProjectConan(ConanFile):
                     "version": str(self.version),
                     "description": self.description,
                     "licenses": [{"license": {"id": "Apache-2.0"}}],
-                    "hashes": [{"alg": "SHA-256", "content": h["sha256"]} 
+                    "hashes": [{"alg": "SHA-256", "content": h["sha256"]}
                               for h in file_hashes.values()],
                     "externalReferences": [
-                        {
-                            "type": "website",
-                            "url": self.homepage
-                        },
-                        {
-                            "type": "vcs",
-                            "url": self.url
-                        }
+                        {"type": "website", "url": self.homepage},
+                        {"type": "vcs", "url": self.url}
                     ],
                     "properties": [
                         {"name": "build_metadata", "value": json.dumps(build_metadata)},
-                        {"name": "conan_options", "value": json.dumps({k: str(v) for k, v in self.options.items()})},
-                        {"name": "build_platform", "value": f"{self.settings.os}-{self.settings.arch}"},
-                        {"name": "package_type", "value": "cpp-library"}
+                        {"name": "fips_compliant", "value": str(self.options.enable_fips)},
+                        {"name": "package_type", "value": "crypto-library"}
                     ]
                 },
-                "tools": [
-                    {
-                        "vendor": "Conan",
-                        "name": "conan",
-                        "version": "2.0"
-                    }
-                ]
+                "tools": [{"vendor": "Conan", "name": "conan", "version": "2.0"}]
             },
             "components": [],
             "vulnerabilities": []
         }
-        
-        # Add dependencies to SBOM
-        deps = getattr(self, "deps_cpp_info", None)
-        if deps and hasattr(deps, "deps"):
-            for dep in deps.deps:
-                try:
-                    dep_version = str(deps[dep].version) if hasattr(deps[dep], "version") else "unknown"
-                    component = {
-                        "type": "library",
-                        "bom-ref": f"{dep}@{dep_version}",
-                        "name": dep,
-                        "version": dep_version,
-                        "scope": "required",
-                        "licenses": []
-                    }
-                    sbom_data["components"].append(component)
-                except Exception as e:
-                    self.output.warning(f"Failed to add dependency {dep} to SBOM: {e}")
-        
+
         # Save SBOM
         sbom_path = os.path.join(self.package_folder, "sbom.json")
         save(self, sbom_path, json.dumps(sbom_data, indent=2))
         self.output.success(f"SBOM generated: {sbom_path}")
-        
-        # Generate package signature if key is available
-        self._sign_package(sbom_path)
-        
-        # Generate vulnerability report placeholder
-        self._generate_vulnerability_report()
-    
-    def _sign_package(self, sbom_path):
-        """Sign package for supply chain security (placeholder for actual signing)"""
-        signing_enabled = os.getenv("CONAN_SIGN_PACKAGES", "false").lower() == "true"
-        
-        if not signing_enabled:
-            self.output.info("Package signing disabled (set CONAN_SIGN_PACKAGES=true to enable)")
-            return
-        
-        self.output.info("Package signing placeholder - integrate with cosign/gpg in production")
-        
-        signature_metadata = {
-            "signed": True,
-            "timestamp": str(os.environ.get("SOURCE_DATE_EPOCH", "")),
-            "algorithm": "placeholder",
-            "keyid": "placeholder"
-        }
-        
-        sig_path = os.path.join(self.package_folder, "package-signature.json")
-        save(self, sig_path, json.dumps(signature_metadata, indent=2))
-    
-    def _generate_vulnerability_report(self):
-        """Generate vulnerability scan report (integration point)"""
-        vuln_report = {
-            "scanTool": "placeholder",
-            "scanDate": str(os.environ.get("SOURCE_DATE_EPOCH", "")),
-            "component": f"{self.name}@{self.version}",
-            "vulnerabilities": [],
-            "note": "Integrate with Trivy/Snyk for actual vulnerability scanning"
-        }
-        
-        vuln_path = os.path.join(self.package_folder, "vulnerability-report.json")
-        save(self, vuln_path, json.dumps(vuln_report, indent=2))
-        self.output.info(f"Vulnerability report placeholder generated: {vuln_path}")
-    
+
     def package_info(self):
-        """Package info following ngapy patterns"""
-        # Set package information
-        self.cpp_info.libs = ["project-name"]  # Change to your library name
-        
-        # Set binary paths
+        """Package info for OpenSSL"""
+        # Libraries
+        if self.options.shared:
+            self.cpp_info.libs = ["ssl", "crypto"]
+        else:
+            self.cpp_info.libs = ["ssl", "crypto"]
+
+        # Paths
         self.cpp_info.bindirs = ["bin"]
         self.cpp_info.includedirs = ["include"]
         self.cpp_info.libdirs = ["lib"]
-        
+
+        # FIPS-specific paths
+        if self.options.enable_fips:
+            self.cpp_info.libdirs.append("lib/ossl-modules")
+
         # Environment variables
         self.env_info.PATH.append(os.path.join(self.package_folder, "bin"))
+
         if self.settings.os == "Linux":
             self.env_info.LD_LIBRARY_PATH.append(os.path.join(self.package_folder, "lib"))
         elif self.settings.os == "Macos":
             self.env_info.DYLD_LIBRARY_PATH.append(os.path.join(self.package_folder, "lib"))
-    
+        elif self.settings.os == "Windows":
+            self.env_info.PATH.append(os.path.join(self.package_folder, "bin"))
+
+        # FIPS configuration
+        if self.options.enable_fips:
+            fips_config = os.path.join(self.package_folder, "res", "fipsmodule.cnf")
+            self.env_info.OPENSSL_FIPS = "1"
+            self.env_info.OPENSSL_CONF = fips_config
+
     def package_id(self):
         """Optimize package ID for better caching"""
-        # Test-only options don't affect package ID
+        # Test and docs options don't affect binary compatibility
         del self.info.options.enable_tests
         del self.info.options.enable_examples
         del self.info.options.enable_docs
