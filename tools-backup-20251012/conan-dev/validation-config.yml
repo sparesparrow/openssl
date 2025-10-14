@@ -11,27 +11,27 @@ environment:
     - g++
     - cmake
     - perl
-  
+
   # Minimum version requirements
   min_conan_version: "2.0.0"
   min_python_version: "3.8"
-  
+
   # Required environment variables
   required_env_vars:
     - CONAN_USER_HOME
     - CONAN_COLOR_DISPLAY
     - CLICOLOR_FORCE
-  
+
   # Disk space requirements (in GB)
   disk_space_gb: 10
-  
+
   # Memory requirements (in GB)
   min_memory_gb: 4
 
 dependencies:
   # Check system packages
   check_system_packages: true
-  
+
   # Required system packages (platform-specific)
   required_system_packages:
     linux:
@@ -49,19 +49,19 @@ dependencies:
       - visual-studio
       - perl
       - nasm
-  
+
   # Check Conan remotes
   check_conan_remotes: true
-  
+
   # Required Conan remotes
   required_remotes:
-    - conancenter
+    - ${CONAN_REPOSITORY_NAME}
     - artifactory
     - github-packages
-  
+
   # Check for required Conan packages
   check_conan_packages: true
-  
+
   # Required Conan packages
   required_conan_packages:
     - zlib/1.3.1
@@ -70,22 +70,22 @@ dependencies:
 configuration:
   # Validate conanfile.py
   validate_conanfile: true
-  
+
   # Check version consistency
   check_version_consistency: true
-  
+
   # Validate Conan profiles
   validate_profiles: true
-  
+
   # Check cache configuration
   check_cache_config: true
-  
+
   # Validate build options
   validate_build_options: true
-  
+
   # Check for required files
   check_required_files: true
-  
+
   # Required files
   required_files:
     - conanfile.py
@@ -98,48 +98,48 @@ configuration:
 security:
   # Check for exposed secrets
   check_secrets: true
-  
+
   # Validate SSL certificates
   validate_ssl_certs: true
-  
+
   # Check file permissions
   check_file_permissions: true
-  
+
   # Check for security vulnerabilities
-  check_vulnerabilities: false  # Requires external tools
-  
+  check_vulnerabilities: false # Requires external tools
+
   # Validate package signatures
-  validate_signatures: false  # Requires signing keys
+  validate_signatures: false # Requires signing keys
 
 cache:
   # Validate cache configuration
   validate_cache_config: true
-  
+
   # Check cache directory permissions
   check_cache_permissions: true
-  
+
   # Validate cache optimization settings
   validate_optimization: true
-  
+
   # Check cache size limits
   check_cache_size: true
-  
+
   # Maximum cache size (in GB)
   max_cache_size_gb: 50
 
 build:
   # Validate build environment
   validate_build_env: true
-  
+
   # Check compiler availability
   check_compilers: true
-  
+
   # Validate build tools
   validate_build_tools: true
-  
+
   # Check for required libraries
   check_libraries: true
-  
+
   # Required libraries
   required_libraries:
     - libssl
@@ -149,26 +149,26 @@ build:
 performance:
   # Check system performance
   check_performance: true
-  
+
   # Minimum CPU cores
   min_cpu_cores: 2
-  
+
   # Check available memory
   check_memory: true
-  
+
   # Check disk I/O performance
-  check_disk_io: false  # Requires specific tools
+  check_disk_io: false # Requires specific tools
 
 ci_cd:
   # Check CI/CD environment
   check_ci_env: true
-  
+
   # Validate GitHub Actions
   validate_github_actions: true
-  
+
   # Check for required secrets
   check_required_secrets: true
-  
+
   # Required secrets
   required_secrets:
     - GITHUB_TOKEN
@@ -179,16 +179,16 @@ ci_cd:
 monitoring:
   # Enable monitoring
   enabled: true
-  
+
   # Log validation results
   log_results: true
-  
+
   # Generate validation report
   generate_report: true
-  
+
   # Report format
-  report_format: "json"  # json, yaml, text
-  
+  report_format: "json" # json, yaml, text
+
   # Report location
   report_location: "validation-results.json"
 
@@ -196,19 +196,19 @@ monitoring:
 rules:
   # Strict mode - treat warnings as errors
   strict_mode: false
-  
+
   # Fail on missing tools
   fail_on_missing_tools: true
-  
+
   # Fail on missing dependencies
   fail_on_missing_deps: true
-  
+
   # Fail on configuration errors
   fail_on_config_errors: true
-  
+
   # Fail on security issues
   fail_on_security_issues: true
-  
+
   # Allow partial validation
   allow_partial: false
 
@@ -216,10 +216,10 @@ rules:
 custom_checks:
   # Enable custom checks
   enabled: false
-  
+
   # Custom check scripts
   scripts: []
-  
+
   # Custom check timeout (seconds)
   timeout: 300
 
@@ -227,12 +227,12 @@ custom_checks:
 output:
   # Verbose output
   verbose: true
-  
+
   # Color output
   color: true
-  
+
   # Progress indicators
   progress: true
-  
+
   # Summary format
-  summary_format: "table"  # table, list, json
+  summary_format: "table" # table, list, json

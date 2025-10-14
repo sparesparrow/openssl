@@ -158,7 +158,7 @@ conan remote add artifactory https://your-artifactory.com/artifactory/api/conan/
 conan user -p $ARTIFACTORY_URL -r artifactory $ARTIFACTORY_USERNAME
 
 # Upload packages
-conan upload "openssl/*" -r=artifactory --all --confirm
+conan upload "openssl/*" -r=artifactory --confirm
 ```
 
 ### Environment Variables

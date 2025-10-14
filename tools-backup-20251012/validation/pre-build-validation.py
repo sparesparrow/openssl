@@ -53,7 +53,7 @@ class PreBuildValidator:
                 'check_system_packages': True,
                 'required_system_packages': ['build-essential', 'perl', 'pkg-config'],
                 'check_conan_remotes': True,
-                'required_remotes': ['conancenter']
+                'required_remotes': ['${CONAN_REPOSITORY_NAME}']
             },
             'configuration': {
                 'validate_conanfile': True,
@@ -350,7 +350,7 @@ class PreBuildValidator:
             
             # Test connection to Conan Center
             context = ssl.create_default_context()
-            with urllib.request.urlopen('https://center.conan.io', context=context) as response:
+            with urllib.request.urlopen('${CONAN_REPOSITORY_URL}', context=context) as response:
                 if response.status == 200:
                     self.info.append("✓ SSL connection to Conan Center successful")
                 else:

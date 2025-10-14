@@ -9,7 +9,7 @@ This document summarizes the comprehensive improvements made to the OpenSSL Cona
 **Status**: ✅ Completed
 
 **Changes Made**:
-- Fixed GitHub Packages URL to use proper Maven repository format: `https://maven.pkg.github.com/${{ github.repository }}`
+- Fixed GitHub Packages URL to use proper Maven repository format: `${CONAN_REPOSITORY_URL} /${{ github.repository }}`
 - Added proper remote configuration with `conan remote add` and `conan remote update`
 - Implemented retry logic with `--retry=3 --retry-wait=10` for upload operations
 - Added error handling to continue builds even if GitHub Packages upload fails

@@ -9,18 +9,18 @@ cache:
       path: "${CONAN_USER_HOME}/.conan2/cache"
       max_size: "10GB"
       cleanup_policy: "lru"
-      
+
     - name: "shared"
       type: "filesystem"
       path: "/shared/conan-cache"
       max_size: "50GB"
       cleanup_policy: "lru"
-      
+
     - name: "remote"
       type: "conan_remote"
       remote: "artifactory"
       max_size: "unlimited"
-      
+
   # Cache key strategies
   key_strategies:
     # Source code cache keys
@@ -40,7 +40,7 @@ cache:
         - "doc/**"
         - "*.md"
         - ".git/**"
-        
+
     # Binary cache keys
     binary:
       include:
@@ -59,7 +59,7 @@ cache:
         - "options.capath"
         - "options.enable_unit_test"
         - "options.enable_demos"
-        
+
   # Cache invalidation rules
   invalidation:
     # Force rebuild conditions
@@ -68,13 +68,13 @@ cache:
       - "conanfile.py changes"
       - "configure script changes"
       - "CMakeLists.txt changes"
-      
+
     # Partial rebuild conditions
     partial_rebuild:
       - "test files change (test only)"
       - "documentation changes (docs only)"
       - "demo files change (demos only)"
-      
+
   # Cache warming strategies
   warming:
     # Pre-populate cache with common configurations
@@ -87,7 +87,7 @@ cache:
         options: "fips=True,shared=True"
       - profile: "macos-clang14"
         options: "fips=True,shared=True,enable_quic=True"
-        
+
     # Pre-build popular variants
     popular_variants:
       - "Release + FIPS + Shared"
@@ -106,27 +106,27 @@ compiler_cache:
     compress_level: 6
     hash_dir: true
     sloppiness: "file_macro,time_macros,include_file_mtime"
-    
+
   # SCCache configuration (alternative to CCache)
   sccache:
     enabled: false
     directory: "/cache/sccache"
     max_size: "5GB"
     compression: "zstd"
-    
+
 # Build cache optimization
 build_cache:
   # Parallel build optimization
   parallel:
     max_jobs: 8
     job_multiplier: 1.5
-    
+
   # Dependency resolution cache
   dependency_cache:
     enabled: true
     ttl: "24h"
     max_entries: 10000
-    
+
   # Build graph cache
   graph_cache:
     enabled: true
@@ -141,18 +141,18 @@ remote_cache:
     remote: "artifactory"
     cache_ttl: "7d"
     max_versions: 10
-    
+
   # GitHub Packages cache
   github_packages:
     enabled: true
     remote: "github-packages"
     cache_ttl: "3d"
     max_versions: 5
-    
+
   # Conan Center cache
   conan_center:
     enabled: true
-    remote: "conancenter"
+    remote: "${CONAN_REPOSITORY_NAME}"
     cache_ttl: "1d"
     max_versions: 3
 
@@ -163,29 +163,29 @@ monitoring:
     enabled: true
     target_hit_rate: 0.8
     alert_threshold: 0.6
-    
+
   # Cache size monitoring
   size_monitoring:
     enabled: true
     max_total_size: "100GB"
     cleanup_threshold: 0.9
-    
+
   # Performance metrics
   performance:
     enabled: true
     track_download_time: true
     track_upload_time: true
     track_build_time: true
-    
+
 # Cache cleanup policies
 cleanup:
   # Automatic cleanup
   automatic:
     enabled: true
-    schedule: "0 2 * * *"  # Daily at 2 AM
+    schedule: "0 2 * * *" # Daily at 2 AM
     max_age: "30d"
     keep_versions: 5
-    
+
   # Manual cleanup commands
   manual:
     - "conan cache clean --all"
@@ -199,12 +199,12 @@ environments:
     cache_dir: "/cache/conan-ci"
     max_size: "20GB"
     cleanup_frequency: "after_each_build"
-    
+
   local:
     cache_dir: "${HOME}/.conan2/cache"
     max_size: "5GB"
     cleanup_frequency: "weekly"
-    
+
   production:
     cache_dir: "/shared/conan-production"
     max_size: "100GB"

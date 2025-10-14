@@ -24,17 +24,17 @@ jobs:
       config_changes: ${{ steps.parse.outputs.config_changes }}
       test_changes: ${{ steps.parse.outputs.test_changes }}
       provider_changes: ${{ steps.parse.outputs.provider_changes }}
-    
+
     steps:
       - name: Parse Context
         id: parse
         run: |
           echo "🔍 Parsing OpenSSL build context..."
-          
+
           # Parse the client payload
           CONTEXT='${{ toJson(github.event.client_payload) }}'
           echo "Context: $CONTEXT"
-          
+
           # Extract key information
           echo "source_repo=$(echo "$CONTEXT" | jq -r '.source_repo')" >> $GITHUB_OUTPUT
           echo "source_sha=$(echo "$CONTEXT" | jq -r '.source_sha')" >> $GITHUB_OUTPUT
@@ -46,7 +46,7 @@ jobs:
           echo "config_changes=$(echo "$CONTEXT" | jq -r '.config_changes')" >> $GITHUB_OUTPUT
           echo "test_changes=$(echo "$CONTEXT" | jq -r '.test_changes')" >> $GITHUB_OUTPUT
           echo "provider_changes=$(echo "$CONTEXT" | jq -r '.provider_changes')" >> $GITHUB_OUTPUT
-          
+
           echo "✅ Context parsed successfully"
           echo "Source Repo: ${{ steps.parse.outputs.source_repo }}"
           echo "Source SHA: ${{ steps.parse.outputs.source_sha }}"
@@ -57,16 +57,16 @@ jobs:
     needs: parse-context
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
-    
+
     steps:
       - name: Checkout openssl-tools
         uses: actions/checkout@v4
-      
+
       - name: Generate Build Matrix
         id: matrix
         run: |
           echo "🔧 Generating build matrix..."
-          
+
           # Run the build matrix generator
           python scripts/build_matrix_generator.py \
             --source-repo "${{ needs.parse-context.outputs.source_repo }}" \
@@ -77,12 +77,12 @@ jobs:
             --test-changes "${{ needs.parse-context.outputs.test_changes }}" \
             --provider-changes "${{ needs.parse-context.outputs.provider_changes }}" \
             --output-format json > matrix.json
-          
+
           # Output matrix for GitHub Actions
           echo "matrix<<EOF" >> $GITHUB_OUTPUT
           cat matrix.json >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-          
+
           echo "✅ Build matrix generated"
 
   build-packages:
@@ -90,7 +90,7 @@ jobs:
     needs: [parse-context, generate-build-matrix]
     strategy:
       matrix: ${{ fromJson(needs.generate-build-matrix.outputs.matrix) }}
-    
+
     steps:
       - name: Checkout OpenSSL Source
         uses: actions/checkout@v4
@@ -98,54 +98,54 @@ jobs:
           repository: ${{ needs.parse-context.outputs.source_repo }}
           ref: ${{ needs.parse-context.outputs.source_sha }}
           fetch-depth: 0
-      
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
-          cache: 'pip'
-      
+          python-version: "3.12"
+          cache: "pip"
+
       - name: Install Conan
         run: |
           pip install conan
           conan --version
-      
+
       - name: Configure Conan
         run: |
           conan config init
           conan config set general.revisions_enabled=1
           conan config set general.cmake_find_package_multi=1
-      
+
       - name: Set up Artifactory
         run: |
           conan remote add artifactory ${{ secrets.ARTIFACTORY_URL }}
           conan user -p ${{ secrets.ARTIFACTORY_URL }} -r artifactory ${{ secrets.ARTIFACTORY_USERNAME }}
-      
+
       - name: Build OpenSSL Package
         run: |
           echo "🔨 Building OpenSSL package..."
           echo "Platform: ${{ matrix.platform }}"
           echo "Profile: ${{ matrix.profile }}"
           echo "Options: ${{ matrix.options }}"
-          
+
           # Build the package
           conan create . --profile=${{ matrix.profile }} ${{ matrix.options }} --build=missing
-          
+
           echo "✅ Package built successfully"
-      
+
       - name: Upload to Artifactory
         run: |
           echo "📦 Uploading package to Artifactory..."
-          
+
           # Upload package
-          conan upload "openssl/*" -r=artifactory --all --confirm --retry=3 --retry-wait=10
-          
+          conan upload "openssl/*" -r=artifactory --confirm --retry=3 --retry-wait=10
+
           echo "✅ Package uploaded successfully"
-      
+
       - name: Generate Build Report
         run: |
           echo "📊 Generating build report..."
-          
+
           # Generate build metrics
           python scripts/artifactory_manager.py generate-report \
             --package-name openssl \
@@ -155,9 +155,9 @@ jobs:
             --build-time ${{ matrix.build_time }} \
             --cache-hits ${{ matrix.cache_hits }} \
             --output build-report.json
-          
+
           echo "✅ Build report generated"
-      
+
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -171,7 +171,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [parse-context, build-packages]
     if: always()
-    
+
     steps:
       - name: Report Status to Source Repository
         uses: actions/github-script@v7
@@ -181,7 +181,7 @@ jobs:
             const sourceSha = '${{ needs.parse-context.outputs.source_sha }}';
             const prNumber = '${{ needs.parse-context.outputs.pr_number }}';
             const buildScope = '${{ needs.parse-context.outputs.build_scope }}';
-            
+
             // Create status check
             const { data: checkRun } = await github.rest.checks.create({
               owner: sourceRepo.split('/')[0],
@@ -196,7 +196,7 @@ jobs:
                 text: `**Build Scope:** ${buildScope}\n**Status:** ${{ job.status }}\n**Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`
               }
             });
-            
+
             // Comment on PR if applicable
             if (prNumber && prNumber !== 'null') {
               const comment = `## 🔄 OpenSSL Tools CI Complete\n\n**Build Scope:** ${buildScope}\n**Status:** ${{ job.status }}\n**Workflow Run:** [${{ github.repository }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
@@ -208,16 +208,16 @@ jobs:
                 body: comment
               });
             }
-      
+
       - name: Update Artifactory Metrics
         run: |
           echo "📈 Updating Artifactory metrics..."
-          
+
           # Update build metrics
           python scripts/artifactory_manager.py update-metrics \
             --workflow-run-id ${{ github.run_id }} \
             --build-scope ${{ needs.parse-context.outputs.build_scope }} \
             --status ${{ job.status }} \
             --timestamp $(date -u +%Y-%m-%dT%H:%M:%SZ)
-          
+
           echo "✅ Metrics updated successfully"
