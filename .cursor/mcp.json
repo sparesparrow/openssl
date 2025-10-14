@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "github-workflow-fixer": {
+      "command": "python",
+      "args": ["scripts/mcp/github_workflow_fixer.py"],
+      "env": {
+        "PYTHONPATH": ".",
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+      }
+    }
+  }
+}
