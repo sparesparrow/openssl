@@ -69,7 +69,7 @@ class OpenSSLConan(ConanFile):
     # Runtime requirements
     def requirements(self):
         if self.options.enable_fips:
-            self.requires("openssl-fips-policy/3.3.0")
+            self.requires("openssl-fips-data/140-3.1")
 
     def system_requirements(self):
         """System requirements for OpenSSL build"""
@@ -122,6 +122,13 @@ class OpenSSLConan(ConanFile):
 
         if self.options.enable_fips and self.options.no_deprecated:
             self.output.info("FIPS mode with no deprecated algorithms - maximum security")
+
+    def source(self):
+        """Get source code and fuzz corpora"""
+        git = Git(self)
+        # Clone fuzz corpora from separate repo
+        git.clone(url="https://github.com/sparesparrow/fuzz-corpora.git", 
+                  target="fuzz/corpora")
 
     def export_sources(self):
         """Export source files"""
