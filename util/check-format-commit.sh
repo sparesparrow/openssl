@@ -20,7 +20,9 @@
 
 # Allowlist of files to scan
 # Currently this is any .c or .h file (with an optional .in suffix)
-FILE_NAME_END_ALLOWLIST=("\.[ch]\(.in\)\?")
+# Allowlist of files to scan
+# Include C headers/sources (with optional .in) and Markdown files
+FILE_NAME_END_ALLOWLIST=("\.[ch]\\(.in\\)\?" "\.md")
 
 # Global vars
 
@@ -93,7 +95,7 @@ done
 REMAINING_FILES=$(wc -l <$TEMPDIR/ranges.filter)
 if [ $REMAINING_FILES -eq 0 ]
 then
-    echo "The given commit range has no C source file changes that require checking"
+    echo "The given commit range has no file changes that require checking"
     exit 0
 fi
 
@@ -167,4 +169,18 @@ cat $TEMPDIR/results-filtered.txt
 if [ -s $TEMPDIR/results-filtered.txt ]
 then
     exit 2
+fi
+
+# If Markdown files changed, run formatting check (non-fatal here, just report)
+if grep -E "\.md " $TEMPDIR/ranges.filter >/dev/null 2>&1; then
+    echo "Checking Markdown formatting for changed files" >&2
+    if [ -x "$TOPDIR/scripts/format_markdown.sh" ]; then
+        (cd $TOPDIR && scripts/format_markdown.sh --check) || MDERR=$?
+        if [ "${MDERR:-0}" -ne 0 ]; then
+            echo "Markdown formatting issues detected. Run scripts/format_markdown.sh to fix." >&2
+            exit 3
+        fi
+    else
+        echo "scripts/format_markdown.sh not found or not executable; skipping Markdown check" >&2
+    fi
 fi

@@ -10,9 +10,6 @@
 #include <openssl/err.h>
 #include <assert.h>
 
-#include <sys/socket.h>
-#include <netinet/in.h>
-
 #define ARRAY_LEN(x) (sizeof(x)/sizeof((x)[0]))
 
 enum {
@@ -231,7 +228,7 @@ static int h3_conn_deferred_consume(nghttp3_conn *h3conn, int64_t stream_id,
     return ret;
 }
 
-OSSL_DEMO_H3_CONN *OSSL_DEMO_H3_CONN_new_for_conn(SSL *qconn,
+OSSL_DEMO_H3_CONN *OSSL_DEMO_H3_CONN_new_for_conn(BIO *qconn_bio,
                                                   const nghttp3_callbacks *callbacks,
                                                   const nghttp3_settings *settings,
                                                   void *user_data)
@@ -245,7 +242,7 @@ OSSL_DEMO_H3_CONN *OSSL_DEMO_H3_CONN_new_for_conn(SSL *qconn,
     nghttp3_callbacks intl_callbacks = {0};
     static const unsigned char alpn[] = {2, 'h', '3'};
 
-    if (qconn == NULL) {
+    if (qconn_bio == NULL) {
         ERR_raise_data(ERR_LIB_USER, ERR_R_PASSED_NULL_PARAMETER,
                        "QUIC connection BIO must be provided");
         return NULL;
@@ -254,19 +251,38 @@ OSSL_DEMO_H3_CONN *OSSL_DEMO_H3_CONN_new_for_conn(SSL *qconn,
     if ((conn = OPENSSL_zalloc(sizeof(OSSL_DEMO_H3_CONN))) == NULL)
         return NULL;
 
-    conn->qconn = qconn;
+    conn->qconn_bio = qconn_bio;
     conn->user_data = user_data;
+
+    if (BIO_get_ssl(qconn_bio, &conn->qconn) == 0) {
+        ERR_raise_data(ERR_LIB_USER, ERR_R_PASSED_INVALID_ARGUMENT,
+                       "BIO must be an SSL BIO");
+        goto err;
+    }
 
     /* Create the map of stream IDs to OSSL_DEMO_H3_STREAM structures. */
     if ((conn->streams = lh_OSSL_DEMO_H3_STREAM_new(h3_stream_hash, h3_stream_eq)) == NULL)
         goto err;
 
-    if (SSL_set_alpn_protos(conn->qconn, alpn, sizeof(alpn))) {
-        /* SSL_set_alpn_protos returns 1 on failure */
-        ERR_raise_data(ERR_LIB_USER, ERR_R_INTERNAL_ERROR,
-                       "failed to configure ALPN");
-        goto err;
-    }
+    /*
+     * If the application has not started connecting yet, helpfully
+     * auto-configure ALPN. If the application wants to initiate the connection
+     * itself, it must take care of this itself.
+     */
+    if (SSL_in_before(conn->qconn))
+        if (SSL_set_alpn_protos(conn->qconn, alpn, sizeof(alpn))) {
+            /* SSL_set_alpn_protos returns 1 on failure */
+            ERR_raise_data(ERR_LIB_USER, ERR_R_INTERNAL_ERROR,
+                           "failed to configure ALPN");
+            goto err;
+        }
+
+    /*
+     * We use the QUIC stack in non-blocking mode so that we can react to
+     * incoming data on different streams, and e.g. incoming streams initiated
+     * by a server, as and when events occur.
+     */
+    BIO_set_nbio(conn->qconn_bio, 1);
 
     /*
      * Disable default stream mode and create all streams explicitly. Each QUIC
@@ -372,39 +388,7 @@ err:
     return NULL;
 }
 
-/*
- * Create BIO with UDP connected socket for one of the address we got from
- * resolver.
- */
-static BIO *
-create_socket_bio(const BIO_ADDRINFO *bai)
-{
-    int sock;
-    BIO *bio;
-
-    sock = BIO_socket(BIO_ADDRINFO_family(bai), SOCK_DGRAM, 0, 0);
-    if (sock == -1)
-        return NULL;
-
-    if (!BIO_connect(sock, BIO_ADDRINFO_address(bai), 0))
-        goto err;
-
-    if (!BIO_socket_nbio(sock, 1))
-        goto err;
-
-    if ((bio = BIO_new(BIO_s_datagram())) == NULL)
-        goto err;
-    BIO_set_fd(bio, sock, BIO_CLOSE);
-
-    return bio;
-err:
-    BIO_closesocket(sock);
-
-    return NULL;
-}
-
-OSSL_DEMO_H3_CONN *OSSL_DEMO_H3_CONN_new_for_addr(SSL_CTX *ctx, const BIO_ADDRINFO *bai,
-                                                  const char *bare_hostname,
+OSSL_DEMO_H3_CONN *OSSL_DEMO_H3_CONN_new_for_addr(SSL_CTX *ctx, const char *addr,
                                                   const nghttp3_callbacks *callbacks,
                                                   const nghttp3_settings *settings,
                                                   void *user_data)
@@ -412,16 +396,26 @@ OSSL_DEMO_H3_CONN *OSSL_DEMO_H3_CONN_new_for_addr(SSL_CTX *ctx, const BIO_ADDRIN
     BIO *qconn_bio = NULL;
     SSL *qconn = NULL;
     OSSL_DEMO_H3_CONN *conn = NULL;
+    const char *bare_hostname;
 
-    if ((qconn_bio = create_socket_bio(bai)) == NULL)
-        return NULL;
-
-    qconn = SSL_new(ctx);
-    if (qconn == NULL)
+    /* QUIC connection setup */
+    if ((qconn_bio = BIO_new_ssl_connect(ctx)) == NULL)
         goto err;
 
-    SSL_set_bio(qconn, qconn_bio, qconn_bio);
-    qconn_bio = NULL;
+    /* Pass the 'hostname:port' string into the ssl_connect BIO. */
+    if (BIO_set_conn_hostname(qconn_bio, addr) == 0)
+        goto err;
+
+    /*
+     * Get the 'bare' hostname out of the ssl_connect BIO. This is the hostname
+     * without the port.
+     */
+    bare_hostname = BIO_get_conn_hostname(qconn_bio);
+    if (bare_hostname == NULL)
+        goto err;
+
+    if (BIO_get_ssl(qconn_bio, &qconn) == 0)
+        goto err;
 
     /* Set the hostname we will validate the X.509 certificate against. */
     if (SSL_set1_host(qconn, bare_hostname) <= 0)
@@ -431,7 +425,7 @@ OSSL_DEMO_H3_CONN *OSSL_DEMO_H3_CONN_new_for_addr(SSL_CTX *ctx, const BIO_ADDRIN
     if (!SSL_set_tlsext_host_name(qconn, bare_hostname))
         goto err;
 
-    conn = OSSL_DEMO_H3_CONN_new_for_conn(qconn, callbacks,
+    conn = OSSL_DEMO_H3_CONN_new_for_conn(qconn_bio, callbacks,
                                           settings, user_data);
     if (conn == NULL)
         goto err;
@@ -439,9 +433,13 @@ OSSL_DEMO_H3_CONN *OSSL_DEMO_H3_CONN_new_for_addr(SSL_CTX *ctx, const BIO_ADDRIN
     return conn;
 
 err:
-    SSL_free(qconn);
     BIO_free_all(qconn_bio);
     return NULL;
+}
+
+int OSSL_DEMO_H3_CONN_connect(OSSL_DEMO_H3_CONN *conn)
+{
+    return SSL_connect(OSSL_DEMO_H3_CONN_get0_connection(conn));
 }
 
 void *OSSL_DEMO_H3_CONN_get_user_data(const OSSL_DEMO_H3_CONN *conn)

@@ -423,10 +423,8 @@ static int ccm_cipher_internal(PROV_CCM_CTX *ctx, unsigned char *out,
             ctx->tag_set = 1;
         } else {
             /* The tag must be set before actually decrypting data */
-            if (!ctx->tag_set) {
-                ERR_raise(ERR_LIB_PROV, PROV_R_TAG_NOT_SET);
+            if (!ctx->tag_set)
                 goto err;
-            }
 
             if (!hw->auth_decrypt(ctx, in, out, len, ctx->buf, ctx->m))
                 goto err;

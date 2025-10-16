@@ -1,0 +1,30 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# Find required dependencies
+find_dependency(openssl-fips-data REQUIRED)
+
+# Include the targets file
+include("${CMAKE_CURRENT_LIST_DIR}/OpenSSLTargets.cmake")
+
+# Set variables for backward compatibility
+set(OPENSSL_FOUND TRUE)
+set(OPENSSL_VERSION @PROJECT_VERSION@)
+set(OPENSSL_INCLUDE_DIR @INCLUDE_INSTALL_DIR@)
+set(OPENSSL_LIBRARIES OpenSSL::SSL OpenSSL::Crypto)
+
+# Check if FIPS is enabled
+if(OPENSSL_FIPS)
+    set(OPENSSL_FIPS_ENABLED TRUE)
+    message(STATUS "OpenSSL FIPS 140-3 mode enabled")
+endif()
+
+# Provide legacy variables for compatibility
+set(OPENSSL_SSL_LIBRARY OpenSSL::SSL)
+set(OPENSSL_CRYPTO_LIBRARY OpenSSL::Crypto)
+set(OPENSSL_INCLUDE_DIRS @INCLUDE_INSTALL_DIR@)
+set(OPENSSL_LIBRARY_DIRS @LIB_INSTALL_DIR@)
+
+# Check if all required components are available
+check_required_components(OpenSSL)

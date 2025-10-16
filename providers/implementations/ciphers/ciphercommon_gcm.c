@@ -443,10 +443,8 @@ static int gcm_cipher_internal(PROV_GCM_CTX *ctx, unsigned char *out,
         }
     } else {
         /* The tag must be set before actually decrypting data */
-        if (!ctx->enc && ctx->taglen == UNINITIALISED_SIZET) {
-            ERR_raise(ERR_LIB_PROV, PROV_R_TAG_NOT_SET);
+        if (!ctx->enc && ctx->taglen == UNINITIALISED_SIZET)
             goto err;
-        }
         if (!hw->cipherfinal(ctx, ctx->buf))
             goto err;
         ctx->iv_state = IV_STATE_FINISHED; /* Don't reuse the IV */

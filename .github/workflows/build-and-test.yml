@@ -1,0 +1,49 @@
+name: Build and Test OpenSSL
+
+on:
+  push:
+    branches: [master, main]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  test-matrix:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        deployment: [general, fips-government]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Conan
+        run: pip install conan
+
+      - name: Add Cloudsmith remote
+        run: |
+          conan remote add ${CONAN_REPOSITORY_NAME} \
+            ${CONAN_REPOSITORY_URL} \
+            --force
+
+      - name: Build OpenSSL
+        run: |
+          conan create . --build=missing \
+            -o deployment_target=${{ matrix.deployment }}
+
+      - name: Upload to Cloudsmith (main branch only)
+        if: github.ref == 'refs/heads/main' && matrix.deployment == 'general'
+        env:
+          CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
+        run: |
+          conan remote login ${CONAN_REPOSITORY_NAME} spare-sparrow \
+            --password "$CLOUDSMITH_API_KEY"
+
+          conan upload "openssl/*" \
+            -r=${CONAN_REPOSITORY_NAME} \
+            --confirm

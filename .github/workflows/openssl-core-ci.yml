@@ -1,0 +1,57 @@
+name: OpenSSL Core CI
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - '**/*.c'
+      - '**/*.h'
+      - '**/Makefile*'
+      - 'Configure'
+      - 'config'
+      - 'ssl/**'
+      - 'crypto/**'
+      - 'apps/**'
+      - 'test/**'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - '**/*.c'
+      - '**/*.h'
+      - '**/Makefile*'
+      - 'Configure'
+      - 'config'
+      - 'ssl/**'
+      - 'crypto/**'
+      - 'apps/**'
+      - 'test/**'
+
+jobs:
+  core-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: ./Configure --debug
+      - name: Build
+        run: make -j$(nproc)
+      - name: Test
+        run: make test
+
+  trigger-tools:
+    needs: core-validation
+    if: success()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch to openssl-tools
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.DISPATCH_TOKEN }}
+          repository: sparesparrow/openssl-tools
+          event-type: openssl-core-updated
+          client-payload: |
+            {
+              "source_sha": "${{ github.sha }}",
+              "source_ref": "${{ github.ref_name }}",
+              "core_validation_passed": true
+            }

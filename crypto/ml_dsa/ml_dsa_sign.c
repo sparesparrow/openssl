@@ -340,8 +340,7 @@ static int ml_dsa_verify_internal(const ML_DSA_KEY *pub,
     size_t c_tilde_len = params->bit_strength >> 2;
     uint32_t z_max;
 
-    /* FIPS 204 compliance: Also validate signature length before decoding */
-    if (mu_len != ML_DSA_MU_BYTES || sig_enc_len != params->sig_len) {
+    if (mu_len != ML_DSA_MU_BYTES) {
         ERR_raise(ERR_LIB_PROV, PROV_R_BAD_LENGTH);
         return 0;
     }

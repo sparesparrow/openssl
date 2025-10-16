@@ -45,7 +45,7 @@ typedef struct ossl_demo_h3_stream_st OSSL_DEMO_H3_STREAM;
  *
  * Returns NULL on failure.
  */
-OSSL_DEMO_H3_CONN *OSSL_DEMO_H3_CONN_new_for_conn(SSL *qconn,
+OSSL_DEMO_H3_CONN *OSSL_DEMO_H3_CONN_new_for_conn(BIO *qconn_bio,
                                                   const nghttp3_callbacks *callbacks,
                                                   const nghttp3_settings *settings,
                                                   void *user_data);
@@ -61,8 +61,7 @@ OSSL_DEMO_H3_CONN *OSSL_DEMO_H3_CONN_new_for_conn(SSL *qconn,
  * SSL_METHOD.
  */
 OSSL_DEMO_H3_CONN *OSSL_DEMO_H3_CONN_new_for_addr(SSL_CTX *ctx,
-                                                  const BIO_ADDRINFO *addr,
-                                                  const char *bare_hostname,
+                                                  const char *addr,
                                                   const nghttp3_callbacks *callbacks,
                                                   const nghttp3_settings *settings,
                                                   void *user_data);
