@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-OpenSSL FIPS Conan Package Recipe
-Based on ngapy-dev patterns for C development with FIPS compliance
+OpenSSL Conan Package Recipe
+Production-ready implementation for upstream integration
 """
 
 from conan import ConanFile
-from conan.tools.cmake import CMakeToolchain, CMakeDeps, cmake_layout
-from conan.tools.files import copy, save, load
-from conan.tools.scm import Git
-from conan.tools.system import package_manager
 from conan.errors import ConanInvalidConfiguration
+from conan.tools.files import copy, save, load, get, replace_in_file
+from conan.tools.cmake import CMakeToolchain, CMakeDeps, cmake_layout
+from conan.tools.system import package_manager
+from conan.tools.scm import Git
 import os
 import re
 import hashlib
@@ -20,7 +20,7 @@ from pathlib import Path
 
 class OpenSSLConan(ConanFile):
     name = "openssl"
-    version = "3.3.0"
+    version = "4.0.0"
 
     # Package metadata
     description = "OpenSSL FIPS 140-3 compliant cryptographic library"
@@ -43,13 +43,24 @@ class OpenSSLConan(ConanFile):
         "no_tls1_1": [True, False],
         "no_deprecated": [True, False],
         "no_engine": [True, False],
+        "no_asm": [True, False],
+        "no_threads": [True, False],
+        "enable_quic": [True, False],
+        "enable_zlib": [True, False],
+        "enable_zstd": [True, False],
+        "enable_sctp": [True, False],
+        "enable_ktls": [True, False],
+        "enable_asan": [True, False],
+        "enable_ubsan": [True, False],
+        "enable_msan": [True, False],
+        "enable_tsan": [True, False],
     }
 
     default_options = {
         "shared": True,
         "fPIC": True,
-        "enable_fips": True,
-        "enable_tests": True,
+        "enable_fips": False,
+        "enable_tests": False,
         "enable_docs": False,
         "enable_examples": False,
         "no_ssl3": True,
@@ -57,6 +68,17 @@ class OpenSSLConan(ConanFile):
         "no_tls1_1": True,
         "no_deprecated": False,
         "no_engine": True,
+        "no_asm": False,
+        "no_threads": False,
+        "enable_quic": True,
+        "enable_zlib": False,
+        "enable_zstd": False,
+        "enable_sctp": False,
+        "enable_ktls": False,
+        "enable_asan": False,
+        "enable_ubsan": False,
+        "enable_msan": False,
+        "enable_tsan": False,
     }
 
     # Build requirements
@@ -65,248 +87,329 @@ class OpenSSLConan(ConanFile):
             self.tool_requires("gtest/1.14.0")
         if self.options.enable_docs:
             self.tool_requires("doxygen/1.9.8")
+        if self.options.enable_zlib:
+            self.requires("zlib/1.3")
+        if self.options.enable_zstd:
+            self.requires("zstd/1.5.5")
 
-    # Runtime requirements
     def requirements(self):
-        if self.options.enable_fips:
-            self.requires("openssl-fips-data/140-3.1")
-
-    def system_requirements(self):
-        """System requirements for OpenSSL build"""
-        package_manager.Apt(self).install([
-            "build-essential", "cmake", "git", "perl", "libperl-dev"
-        ])
-        package_manager.Yum(self).install([
-            "gcc", "gcc-c++", "make", "cmake", "git", "perl", "perl-devel"
-        ])
-        package_manager.PacMan(self).install([
-            "base-devel", "cmake", "git", "perl"
-        ])
-        package_manager.Zypper(self).install([
-            "gcc", "gcc-c++", "make", "cmake", "git", "perl", "perl-devel"
-        ])
-
-    def set_version(self):
-        """Set version from git tags or VERSION.dat"""
-        try:
-            git = Git(self)
-            version = git.run("describe --tags --always --dirty")
-            if version:
-                version = version.strip().replace("v", "")
-                self.version = version
-            else:
-                # Fallback to VERSION.dat
-                version_file = os.path.join(self.source_folder, "VERSION.dat")
-                if os.path.exists(version_file):
-                    with open(version_file, 'r') as f:
-                        version_data = f.read().strip()
-                        # Parse VERSION.dat format
-                        self.version = version_data.split()[0]
-        except:
-            self.version = "3.3.0"
+        """Add tool requirements for layered architecture"""
+        # Add openssl-tools as tool_requires for build orchestration
+        self.tool_requires("openssl-tools/1.0.0")
 
     def configure(self):
         """Configure package options"""
-        if self.options.enable_fips and not self.options.no_deprecated:
-            self.output.warn("FIPS mode enabled with deprecated algorithms - consider setting no_deprecated=True")
-
         # Static builds need fPIC
         if not self.options.shared:
             self.options.fPIC = True
 
     def validate(self):
         """Validate configuration"""
-        if self.options.enable_fips and self.settings.compiler == "gcc":
-            if self.settings.compiler.version < "7":
-                raise ConanInvalidConfiguration("FIPS mode requires GCC 7+")
-
-        if self.options.enable_fips and self.options.no_deprecated:
-            self.output.info("FIPS mode with no deprecated algorithms - maximum security")
-
-    def source(self):
-        """Get source code and fuzz corpora"""
-        git = Git(self)
-        # Clone fuzz corpora from separate repo
-        git.clone(url="https://github.com/sparesparrow/fuzz-corpora.git", 
-                  target="fuzz/corpora")
+        # FIPS mode requires specific configurations
+        if self.options.enable_fips:
+            if self.options.shared:
+                raise ConanInvalidConfiguration("FIPS mode requires static libraries")
+            if self.options.no_deprecated:
+                raise ConanInvalidConfiguration("FIPS mode requires deprecated APIs")
+            if self.options.enable_asan or self.options.enable_ubsan or self.options.enable_msan or self.options.enable_tsan:
+                raise ConanInvalidConfiguration("FIPS mode is incompatible with sanitizers")
 
     def export_sources(self):
         """Export source files"""
-        copy(self, "*", src=self.source_folder, dst=self.export_sources_folder)
+        # Export essential source files for OpenSSL build
+        copy(self, "*.pm", src=".", dst=self.export_sources_folder)
+        copy(self, "*.conf", src=".", dst=self.export_sources_folder)
+        copy(self, "*.tmpl", src=".", dst=self.export_sources_folder)
+        copy(self, "*.info", src=".", dst=self.export_sources_folder)
+        copy(self, "*.num", src=".", dst=self.export_sources_folder)
+        copy(self, "config*", src=".", dst=self.export_sources_folder)
+        copy(self, "Configure*", src=".", dst=self.export_sources_folder)
+        copy(self, "Makefile*", src=".", dst=self.export_sources_folder)
+        copy(self, "VERSION*", src=".", dst=self.export_sources_folder)
+        copy(self, "LICENSE*", src=".", dst=self.export_sources_folder)
+        copy(self, "README*", src=".", dst=self.export_sources_folder)
+        copy(self, "include/**", src=".", dst=self.export_sources_folder)
+        copy(self, "crypto/**", src=".", dst=self.export_sources_folder)
+        copy(self, "ssl/**", src=".", dst=self.export_sources_folder)
+        copy(self, "apps/**", src=".", dst=self.export_sources_folder)
+        copy(self, "test/**", src=".", dst=self.export_sources_folder)
+        copy(self, "util/**", src=".", dst=self.export_sources_folder)
+        copy(self, "engines/**", src=".", dst=self.export_sources_folder)
+        copy(self, "providers/**", src=".", dst=self.export_sources_folder)
+        copy(self, "fuzz/**", src=".", dst=self.export_sources_folder)
+        copy(self, "doc/**", src=".", dst=self.export_sources_folder)
+        copy(self, "*.py", src=".", dst=self.export_sources_folder)
+        copy(self, "*.dat", src=".", dst=self.export_sources_folder)
+        copy(self, "*.txt", src=".", dst=self.export_sources_folder)
+        copy(self, "*.com", src=".", dst=self.export_sources_folder)
+        copy(self, "*.in", src=".", dst=self.export_sources_folder)
+        copy(self, "*.inc", src=".", dst=self.export_sources_folder)
+        copy(self, "*.checksum", src=".", dst=self.export_sources_folder)
+        copy(self, "*.c", src=".", dst=self.export_sources_folder)
+        copy(self, "*.checksums", src=".", dst=self.export_sources_folder)
+        copy(self, "*.sources", src=".", dst=self.export_sources_folder)
+        copy(self, "*.h", src=".", dst=self.export_sources_folder)
+        copy(self, "*.H", src=".", dst=self.export_sources_folder)
+        copy(self, "*.asn1", src=".", dst=self.export_sources_folder)
+        copy(self, "*.ec", src=".", dst=self.export_sources_folder)
+        copy(self, "*.pl", src=".", dst=self.export_sources_folder)
+        copy(self, "*.S", src=".", dst=self.export_sources_folder)
+        copy(self, "*.asm", src=".", dst=self.export_sources_folder)
+        copy(self, "*.m4", src=".", dst=self.export_sources_folder)
+        copy(self, "*.pem", src=".", dst=self.export_sources_folder)
+        copy(self, "*.der", src=".", dst=self.export_sources_folder)
+        copy(self, "*.bin", src=".", dst=self.export_sources_folder)
+        copy(self, "*.cnf", src=".", dst=self.export_sources_folder)
+        copy(self, "*.pfx", src=".", dst=self.export_sources_folder)
+        copy(self, "*.ors", src=".", dst=self.export_sources_folder)
+        copy(self, "*.sh", src=".", dst=self.export_sources_folder)
+        copy(self, "*.attr", src=".", dst=self.export_sources_folder)
+        copy(self, "*.sct", src=".", dst=self.export_sources_folder)
+        copy(self, "*.t", src=".", dst=self.export_sources_folder)
+        copy(self, "*.crt", src=".", dst=self.export_sources_folder)
+        copy(self, "*.key", src=".", dst=self.export_sources_folder)
+        copy(self, "*.p12", src=".", dst=self.export_sources_folder)
+        copy(self, "*.cms", src=".", dst=self.export_sources_folder)
+        copy(self, "*.0", src=".", dst=self.export_sources_folder)
+        copy(self, "*.ascii", src=".", dst=self.export_sources_folder)
+        copy(self, "*.utf8", src=".", dst=self.export_sources_folder)
+        copy(self, "*.pvk", src=".", dst=self.export_sources_folder)
+        copy(self, "*.msb", src=".", dst=self.export_sources_folder)
+        copy(self, "*.csr", src=".", dst=self.export_sources_folder)
+        copy(self, "*.expected", src=".", dst=self.export_sources_folder)
+        copy(self, "*.noncnf", src=".", dst=self.export_sources_folder)
+        copy(self, "*.expected2", src=".", dst=self.export_sources_folder)
+        copy(self, "*.expected1", src=".", dst=self.export_sources_folder)
+        copy(self, "*.bak", src=".", dst=self.export_sources_folder)
+        copy(self, "*.tsq", src=".", dst=self.export_sources_folder)
+        copy(self, "*.tsr", src=".", dst=self.export_sources_folder)
+        copy(self, "*.csv", src=".", dst=self.export_sources_folder)
+        copy(self, "*.pkcs7", src=".", dst=self.export_sources_folder)
+        copy(self, "*.out", src=".", dst=self.export_sources_folder)
+        copy(self, "*.text", src=".", dst=self.export_sources_folder)
+        copy(self, "*.tlssct", src=".", dst=self.export_sources_folder)
+        copy(self, "*.eml", src=".", dst=self.export_sources_folder)
+        copy(self, "*.Configure", src=".", dst=self.export_sources_folder)
+        copy(self, "*.srl", src=".", dst=self.export_sources_folder)
+        copy(self, "*.config", src=".", dst=self.export_sources_folder)
+        copy(self, "*.syms", src=".", dst=self.export_sources_folder)
+        copy(self, "*.rb", src=".", dst=self.export_sources_folder)
+        copy(self, "*.pro", src=".", dst=self.export_sources_folder)
+        copy(self, "*.sed", src=".", dst=self.export_sources_folder)
+        copy(self, "*.json", src=".", dst=self.export_sources_folder)
+        copy(self, "*.el", src=".", dst=self.export_sources_folder)
+        copy(self, "*.pod", src=".", dst=self.export_sources_folder)
+        copy(self, "*.png", src=".", dst=self.export_sources_folder)
+        copy(self, "*.dot", src=".", dst=self.export_sources_folder)
+        copy(self, "*.ods", src=".", dst=self.export_sources_folder)
+        copy(self, "*.svg", src=".", dst=self.export_sources_folder)
+        copy(self, "*.plantuml", src=".", dst=self.export_sources_folder)
+        copy(self, "*.odg", src=".", dst=self.export_sources_folder)
+        copy(self, "*.def", src=".", dst=self.export_sources_folder)
 
-    def layout(self):
-        """Define build layout"""
-        cmake_layout(self)
+    def source(self):
+        """Get source code"""
+        # Source is already available in the repository
+        pass
 
-    def generate(self):
-        """Generate build configuration"""
-        deps = CMakeDeps(self)
-        deps.generate()
-
-        tc = CMakeToolchain(self)
-        tc.variables["OPENSSL_FIPS"] = self.options.enable_fips
-        tc.variables["ENABLE_TESTS"] = self.options.enable_tests
-        tc.variables["ENABLE_EXAMPLES"] = self.options.enable_examples
-        tc.variables["ENABLE_DOCS"] = self.options.enable_docs
-        tc.variables["OPENSSL_NO_SSL3"] = self.options.no_ssl3
-        tc.variables["OPENSSL_NO_TLS1"] = self.options.no_tls1
-        tc.variables["OPENSSL_NO_TLS1_1"] = self.options.no_tls1_1
-        tc.variables["OPENSSL_NO_DEPRECATED"] = self.options.no_deprecated
-        tc.variables["OPENSSL_NO_ENGINE"] = self.options.no_engine
-        tc.generate()
+    def _get_configure_args(self):
+        """Build configure arguments based on options"""
+        args = []
+        
+        # Platform-specific configuration
+        if self.settings.os == "Linux":
+            if self.settings.arch == "x86_64":
+                args.append("linux-x86_64")
+            elif self.settings.arch == "armv8":
+                args.append("linux-aarch64")
+            else:
+                args.append("linux-generic64")
+        elif self.settings.os == "Windows":
+            if self.settings.compiler == "msvc":
+                args.append("VC-WIN64A" if self.settings.arch == "x86_64" else "VC-WIN32")
+            else:
+                args.append("mingw64" if self.settings.arch == "x86_64" else "mingw")
+        elif self.settings.os == "Macos":
+            if self.settings.arch == "armv8":
+                args.append("darwin64-arm64-cc")
+            else:
+                args.append("darwin64-x86_64-cc")
+        
+        # Shared/static libraries
+        if not self.options.shared:
+            args.append("no-shared")
+        
+        # Position independent code
+        if self.options.fPIC:
+            args.append("-fPIC")
+        
+        # FIPS mode
+        if self.options.enable_fips:
+            args.append("enable-fips")
+        
+        # SSL/TLS protocol options
+        if self.options.no_ssl3:
+            args.append("no-ssl3")
+        if self.options.no_tls1:
+            args.append("no-tls1")
+        if self.options.no_tls1_1:
+            args.append("no-tls1_1")
+        
+        # Feature options
+        if self.options.no_deprecated:
+            args.append("no-deprecated")
+        if self.options.no_engine:
+            args.append("no-engine")
+        if self.options.no_asm:
+            args.append("no-asm")
+        if self.options.no_threads:
+            args.append("no-threads")
+        if self.options.enable_quic:
+            args.append("enable-quic")
+        if self.options.enable_zlib:
+            args.append("zlib")
+        if self.options.enable_zstd:
+            args.append("zstd")
+        if self.options.enable_sctp:
+            args.append("sctp")
+        if self.options.enable_ktls:
+            args.append("enable-ktls")
+        
+        # Sanitizers
+        if self.options.enable_asan:
+            args.append("enable-asan")
+        if self.options.enable_ubsan:
+            args.append("enable-ubsan")
+        if self.options.enable_msan:
+            args.append("enable-msan")
+        if self.options.enable_tsan:
+            args.append("enable-tsan")
+        
+        # Build type specific options
+        if self.settings.build_type == "Debug":
+            args.append("--debug")
+        
+        return args
 
     def build(self):
-        """Build OpenSSL"""
-        cmake = CMake(self)
-        cmake.configure()
-        cmake.build()
-
+        """Build OpenSSL using traditional Configure/Make"""
+        self.output.info("Building OpenSSL using traditional Configure/Make build system")
+        
+        # Configure OpenSSL
+        configure_args = self._get_configure_args()
+        configure_cmd = f"./Configure {' '.join(configure_args)} --prefix=/usr/local/ssl"
+        
+        self.output.info(f"Configure command: {configure_cmd}")
+        self.run(configure_cmd, cwd=self.source_folder)
+        
+        # Build OpenSSL
+        jobs = os.getenv("CONAN_CPU_COUNT", "1")
+        self.run(f"make -j{jobs}", cwd=self.source_folder)
+        
         # Run tests if enabled
         if self.options.enable_tests:
-            cmake.test()
+            self.output.info("Running OpenSSL tests")
+            self.run("make test", cwd=self.source_folder)
 
     def package(self):
         """Package OpenSSL"""
-        # Copy headers
-        copy(self, "*.h", src=os.path.join(self.source_folder, "include"),
-             dst=os.path.join(self.package_folder, "include"))
-        copy(self, "*.h", src=self.build_folder,
-             dst=os.path.join(self.package_folder, "include"))
-
-        # Copy libraries
-        copy(self, "*.lib", src=self.build_folder, dst=os.path.join(self.package_folder, "lib"), keep_path=False)
-        copy(self, "*.a", src=self.build_folder, dst=os.path.join(self.package_folder, "lib"), keep_path=False)
-        copy(self, "*.so*", src=self.build_folder, dst=os.path.join(self.package_folder, "lib"), keep_path=False)
-        copy(self, "*.dylib", src=self.build_folder, dst=os.path.join(self.package_folder, "lib"), keep_path=False)
-        copy(self, "*.dll", src=self.build_folder, dst=os.path.join(self.package_folder, "bin"), keep_path=False)
-
-        # Copy executables
-        copy(self, "openssl*", src=self.build_folder, dst=os.path.join(self.package_folder, "bin"), keep_path=False)
-
-        # Copy FIPS module if built
-        if self.options.enable_fips:
-            copy(self, "fips.so", src=self.build_folder, dst=os.path.join(self.package_folder, "lib/ossl-modules"), keep_path=False)
-            copy(self, "fips.dll", src=self.build_folder, dst=os.path.join(self.package_folder, "bin"), keep_path=False)
-
-        # Copy license and docs
-        copy(self, "LICENSE*", src=self.source_folder, dst=os.path.join(self.package_folder, "licenses"))
-        copy(self, "CHANGES*", src=self.source_folder, dst=os.path.join(self.package_folder, "licenses"))
-
-        # Generate SBOM for security compliance
+        # Install OpenSSL to package folder
+        self.run("make install_sw install_ssldirs DESTDIR=" + self.package_folder, cwd=self.source_folder)
+        
+        # Copy license
+        copy(self, "LICENSE.txt", src=self.source_folder, dst=os.path.join(self.package_folder, "licenses"))
+        
+        # Generate SBOM
         self._generate_sbom()
-
-    def _calculate_file_hash(self, filepath, algorithm='sha256'):
-        """Calculate cryptographic hash of a file"""
-        hash_func = getattr(hashlib, algorithm)()
-        try:
-            with open(filepath, 'rb') as f:
-                for chunk in iter(lambda: f.read(4096), b""):
-                    hash_func.update(chunk)
-            return hash_func.hexdigest()
-        except Exception as e:
-            self.output.warning(f"Failed to calculate hash for {filepath}: {e}")
-            return None
+        
+        self.output.info("Packaging OpenSSL completed")
 
     def _generate_sbom(self):
-        """Generate Software Bill of Materials for security compliance"""
-        self.output.info("Generating Software Bill of Materials (SBOM)...")
-
-        file_hashes = {}
-        for root, dirs, files in os.walk(self.package_folder):
-            for file in files:
-                if file.endswith(('.h', '.c', '.lib', '.a', '.so', '.dll', '.exe')):
-                    file_path = os.path.join(root, file)
-                    sha256 = self._calculate_file_hash(file_path, 'sha256')
-                    if sha256:
-                        rel_path = os.path.relpath(file_path, self.package_folder)
-                        file_hashes[rel_path] = {
-                            "sha256": sha256,
-                            "algorithm": "SHA-256"
+        """Generate Software Bill of Materials"""
+        try:
+            sbom_data = {
+                "bomFormat": "CycloneDX",
+                "specVersion": "1.4",
+                "version": 1,
+                "metadata": {
+                    "timestamp": str(uuid.uuid4()),
+                    "tools": [
+                        {
+                            "vendor": "OpenSSL",
+                            "name": "Conan Package",
+                            "version": self.version
                         }
-
-        build_metadata = {
-            "build_timestamp": os.environ.get("SOURCE_DATE_EPOCH", ""),
-            "build_platform": f"{self.settings.os}-{self.settings.arch}",
-            "compiler": f"{self.settings.compiler}-{self.settings.compiler.version}",
-            "build_type": str(self.settings.build_type),
-            "fips_enabled": self.options.enable_fips,
-            "conan_version": "2.0",
-            "openssl_version": self.version
-        }
-
-        sbom_data = {
-            "bomFormat": "CycloneDX",
-            "specVersion": "1.5",
-            "serialNumber": f"urn:uuid:{uuid.uuid4()}",
-            "version": 1,
-            "metadata": {
-                "timestamp": str(os.environ.get("SOURCE_DATE_EPOCH", "")),
-                "component": {
-                    "type": "library",
-                    "bom-ref": f"{self.name}@{self.version}",
-                    "name": self.name,
-                    "version": str(self.version),
-                    "description": self.description,
-                    "licenses": [{"license": {"id": "Apache-2.0"}}],
-                    "hashes": [{"alg": "SHA-256", "content": h["sha256"]}
-                              for h in file_hashes.values()],
-                    "externalReferences": [
-                        {"type": "website", "url": self.homepage},
-                        {"type": "vcs", "url": self.url}
                     ],
-                    "properties": [
-                        {"name": "build_metadata", "value": json.dumps(build_metadata)},
-                        {"name": "fips_compliant", "value": str(self.options.enable_fips)},
-                        {"name": "package_type", "value": "crypto-library"}
-                    ]
+                    "component": {
+                        "type": "library",
+                        "name": self.name,
+                        "version": self.version,
+                        "description": self.description,
+                        "licenses": [{"id": self.license}],
+                        "purl": f"pkg:conan/{self.name}@{self.version}",
+                        "properties": [
+                            {"name": "build_type", "value": str(self.settings.build_type)},
+                            {"name": "shared", "value": str(self.options.shared)},
+                            {"name": "enable_fips", "value": str(self.options.enable_fips)},
+                            {"name": "os", "value": str(self.settings.os)},
+                            {"name": "arch", "value": str(self.settings.arch)},
+                            {"name": "compiler", "value": str(self.settings.compiler)},
+                        ]
+                    }
                 },
-                "tools": [{"vendor": "Conan", "name": "conan", "version": "2.0"}]
-            },
-            "components": [],
-            "vulnerabilities": []
-        }
-
-        # Save SBOM
-        sbom_path = os.path.join(self.package_folder, "sbom.json")
-        save(self, sbom_path, json.dumps(sbom_data, indent=2))
-        self.output.success(f"SBOM generated: {sbom_path}")
+                "components": [
+                    {
+                        "type": "library",
+                        "name": self.name,
+                        "version": self.version,
+                        "description": self.description,
+                        "licenses": [{"id": self.license}],
+                        "purl": f"pkg:conan/{self.name}@{self.version}"
+                    }
+                ]
+            }
+            
+            sbom_path = os.path.join(self.package_folder, "sbom.json")
+            save(self, sbom_path, json.dumps(sbom_data, indent=2))
+            self.output.info(f"SBOM generated: {sbom_path}")
+            
+        except Exception as e:
+            self.output.warn(f"Failed to generate SBOM: {e}")
 
     def package_info(self):
         """Package info for OpenSSL"""
         # Libraries
-        if self.options.shared:
-            self.cpp_info.libs = ["ssl", "crypto"]
-        else:
-            self.cpp_info.libs = ["ssl", "crypto"]
+        self.cpp_info.libs = ["ssl", "crypto"]
 
         # Paths
         self.cpp_info.bindirs = ["bin"]
         self.cpp_info.includedirs = ["include"]
         self.cpp_info.libdirs = ["lib"]
-
-        # FIPS-specific paths
-        if self.options.enable_fips:
-            self.cpp_info.libdirs.append("lib/ossl-modules")
-
-        # Environment variables
-        self.env_info.PATH.append(os.path.join(self.package_folder, "bin"))
-
+        
+        # System libraries
         if self.settings.os == "Linux":
-            self.env_info.LD_LIBRARY_PATH.append(os.path.join(self.package_folder, "lib"))
-        elif self.settings.os == "Macos":
-            self.env_info.DYLD_LIBRARY_PATH.append(os.path.join(self.package_folder, "lib"))
+            self.cpp_info.system_libs.extend(["dl", "pthread"])
         elif self.settings.os == "Windows":
-            self.env_info.PATH.append(os.path.join(self.package_folder, "bin"))
-
-        # FIPS configuration
+            self.cpp_info.system_libs.extend(["ws2_32", "gdi32", "advapi32", "crypt32", "user32"])
+        elif self.settings.os == "Macos":
+            self.cpp_info.frameworks.append("Security")
+        
+        # Environment variables
+        self.runenv_info.define("OPENSSL_ROOT_DIR", self.package_folder)
+        self.runenv_info.define("OPENSSL_CONF", os.path.join(self.package_folder, "ssl", "openssl.cnf"))
+        
+        # CMake variables
+        self.cpp_info.set_property("cmake_file_name", "OpenSSL")
+        self.cpp_info.set_property("cmake_target_name", "OpenSSL::SSL")
+        self.cpp_info.set_property("cmake_target_aliases", ["OpenSSL::Crypto"])
+        
+        # PKG_CONFIG
+        self.cpp_info.set_property("pkg_config_name", "openssl")
+        
+        # Version info
+        self.cpp_info.set_property("version", self.version)
+        
+        # FIPS mode indicator
         if self.options.enable_fips:
-            fips_config = os.path.join(self.package_folder, "res", "fipsmodule.cnf")
-            self.env_info.OPENSSL_FIPS = "1"
-            self.env_info.OPENSSL_CONF = fips_config
-
-    def package_id(self):
-        """Optimize package ID for better caching"""
-        # Test and docs options don't affect binary compatibility
-        del self.info.options.enable_tests
-        del self.info.options.enable_examples
-        del self.info.options.enable_docs
+            self.cpp_info.defines.append("OPENSSL_FIPS")
+            self.runenv_info.define("OPENSSL_FIPS", "1")

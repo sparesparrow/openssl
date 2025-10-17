@@ -443,10 +443,17 @@ compile_commands.json
 # Conan
 .conan/
 .conan2/
+conanbuild.sh
+conanbuildenv*.sh
+conanrun.sh
+conanrunenv*.sh
+deactivate_conanbuild.sh
+deactivate_conanrun.sh
+CMakePresets.json
+conan_toolchain.cmake
 conan.lock
 conanbuildinfo.*
 CMakeUserPresets.json
 build/
 test_package/build/
 artifactory.token
-
