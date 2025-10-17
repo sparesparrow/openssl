@@ -17,6 +17,12 @@ The protocol implementations are based on a full-strength general purpose
 cryptographic library, which can also be used stand-alone. Also included is a
 cryptographic module validated to conform with FIPS standards.
 
+## Development Workflow
+
+Conan-based builds (modern package manager support)
+---------------------------------------------------
+For a concise, show-over-tell guide to building and consuming OpenSSL with Conan 2.x, see [BUILDING-CONAN.md](BUILDING-CONAN.md). It includes minimal examples (`conan install`, `CMakeDeps`, `find_package(OpenSSL REQUIRED)`) and platform notes.
+
 OpenSSL is descended from the SSLeay library developed by Eric A. Young
 and Tim J. Hudson.
 
