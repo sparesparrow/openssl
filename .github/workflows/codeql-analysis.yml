@@ -1,0 +1,221 @@
+name: CodeQL Security Analysis
+
+on:
+    push:
+        branches: [main, chore/minimal-conan-upstream-clean]
+    pull_request:
+        branches: [main, chore/minimal-conan-upstream-clean]
+    schedule:
+        - cron: "0 6 * * 1" # Weekly Monday 6 AM
+    workflow_dispatch:
+        inputs:
+            languages:
+                description: "Languages to analyze (cpp|all)"
+                required: false
+                type: choice
+                options:
+                    - cpp
+                    - all
+                default: "cpp"
+            query-suites:
+                description: "Query suites to run (security-extended|security-and-quality|all)"
+                required: false
+                type: choice
+                options:
+                    - security-extended
+                    - security-and-quality
+                    - all
+                default: "security-extended"
+
+env:
+    CONAN_VERSION: "2.21.0"
+
+jobs:
+    analyze:
+        name: Analyze C/C++ code
+        runs-on: ubuntu-latest
+        permissions:
+            actions: read
+            contents: read
+            security-events: write
+
+        strategy:
+            fail-fast: false
+            matrix:
+                language: ["cpp"]
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  # We must fetch at least the immediate parents so that if this is
+                  # a pull request then we can checkout the head.
+                  fetch-depth: 2
+
+            - name: Initialize CodeQL
+              uses: github/codeql-action/init@v3
+              with:
+                  languages: ${{ matrix.language }}
+                  queries: ${{ github.event.inputs.query-suites || 'security-extended' }}
+                  config-file: ./.github/codeql/codeql-config.yml
+
+            - name: Install build dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y build-essential perl libssl-dev zlib1g-dev
+
+            - name: Install Conan (if needed for build)
+              if: github.event.inputs.languages == 'all'
+              run: |
+                  pip install conan==${{ env.CONAN_VERSION }}
+                  conan profile detect --force
+
+            - name: Build OpenSSL
+              run: |
+                  # Configure OpenSSL for analysis
+                  ./Configure linux-x86_64 --debug
+
+                  # Build with debug symbols for better analysis
+                  make -j$(nproc)
+
+                  # Also build with FIPS for comprehensive analysis
+                  make clean
+                  ./Configure linux-x86_64 enable-fips --debug
+                  make -j$(nproc)
+
+                  echo "✅ OpenSSL build completed for CodeQL analysis"
+
+            - name: Perform CodeQL Analysis
+              uses: github/codeql-action/analyze@v3
+              with:
+                  category: "/language:${{matrix.language}}"
+
+            - name: Generate security summary
+              run: |
+                  echo "## 🔍 CodeQL Security Analysis Complete" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "**Analysis Details:**" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Language**: ${{ matrix.language }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Query Suite**: ${{ github.event.inputs.query-suites || 'security-extended' }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **OpenSSL Version**: $(cat VERSION.dat)" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Build Configuration**: Debug with FIPS support" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "**Next Steps:**" >> $GITHUB_STEP_SUMMARY
+                  echo "1. Review findings in the Security tab" >> $GITHUB_STEP_SUMMARY
+                  echo "2. Address any critical or high severity issues" >> $GITHUB_STEP_SUMMARY
+                  echo "3. Re-run analysis after fixes" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "✅ CodeQL analysis completed successfully" >> $GITHUB_STEP_SUMMARY
+
+    # Additional job for comprehensive analysis on schedule
+    comprehensive-analysis:
+        name: Comprehensive Security Analysis
+        runs-on: ubuntu-latest
+        if: github.event_name == 'schedule' || github.event.inputs.query-suites == 'all'
+        permissions:
+            actions: read
+            contents: read
+            security-events: write
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 2
+
+            - name: Initialize CodeQL with comprehensive queries
+              uses: github/codeql-action/init@v3
+              with:
+                  languages: cpp
+                  queries: security-and-quality
+                  config-file: ./.github/codeql/codeql-config.yml
+
+            - name: Install build dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y build-essential perl libssl-dev zlib1g-dev
+
+            - name: Build OpenSSL with multiple configurations
+              run: |
+                  # Standard build
+                  ./Configure linux-x86_64 --debug
+                  make -j$(nproc)
+
+                  # FIPS build
+                  make clean
+                  ./Configure linux-x86_64 enable-fips --debug
+                  make -j$(nproc)
+
+                  # Static build
+                  make clean
+                  ./Configure linux-x86_64 no-shared --debug
+                  make -j$(nproc)
+
+                  echo "✅ Multiple OpenSSL configurations built for comprehensive analysis"
+
+            - name: Perform comprehensive CodeQL analysis
+              uses: github/codeql-action/analyze@v3
+              with:
+                  category: "/language:cpp/comprehensive"
+
+            - name: Generate comprehensive security report
+              run: |
+                  echo "## 🔍 Comprehensive CodeQL Analysis Complete" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "**Analysis Scope:**" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Query Suite**: security-and-quality (comprehensive)" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Build Configurations**: Standard, FIPS, Static" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Analysis Type**: Scheduled comprehensive scan" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "**Coverage:**" >> $GITHUB_STEP_SUMMARY
+                  echo "- Security vulnerabilities" >> $GITHUB_STEP_SUMMARY
+                  echo "- Code quality issues" >> $GITHUB_STEP_SUMMARY
+                  echo "- Performance anti-patterns" >> $GITHUB_STEP_SUMMARY
+                  echo "- Maintainability concerns" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "✅ Comprehensive analysis completed" >> $GITHUB_STEP_SUMMARY
+
+    # Job to check for new security advisories
+    security-advisory-check:
+        name: Check Security Advisories
+        runs-on: ubuntu-latest
+        if: github.event_name == 'schedule'
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Check for OpenSSL security advisories
+              run: |
+                  echo "🔍 Checking for OpenSSL security advisories..."
+
+                  # Get current OpenSSL version
+                  CURRENT_VERSION=$(cat VERSION.dat | grep -oP '\d+\.\d+\.\d+' | head -1)
+                  echo "Current OpenSSL version: $CURRENT_VERSION"
+
+                  # Check GitHub Security Advisories
+                  echo "Checking GitHub Security Advisories for OpenSSL..."
+                  curl -s "https://api.github.com/repos/openssl/openssl/security-advisories" | \
+                    jq -r '.[] | select(.state == "published") | "\(.summary) - \(.published_at)"' | \
+                    head -5
+
+                  # Check OpenSSL official security page
+                  echo "Checking OpenSSL official security page..."
+                  curl -s "https://www.openssl.org/news/secadv/" | \
+                    grep -oP 'OpenSSL \d+\.\d+\.\d+' | \
+                    head -5
+
+                  echo "✅ Security advisory check completed"
+
+            - name: Generate security advisory summary
+              run: |
+                  echo "## 🔒 Security Advisory Check" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "**Current OpenSSL Version**: $(cat VERSION.dat | grep -oP '\d+\.\d+\.\d+' | head -1)" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "**Recommendations:**" >> $GITHUB_STEP_SUMMARY
+                  echo "1. Review any new security advisories" >> $GITHUB_STEP_SUMMARY
+                  echo "2. Update to latest version if vulnerabilities found" >> $GITHUB_STEP_SUMMARY
+                  echo "3. Re-run CodeQL analysis after updates" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "✅ Security advisory check completed" >> $GITHUB_STEP_SUMMARY

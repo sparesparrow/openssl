@@ -1,0 +1,54 @@
+name: "OpenSSL CodeQL Configuration"
+
+# CodeQL configuration for OpenSSL security analysis
+# This file customizes the CodeQL analysis for OpenSSL-specific patterns
+
+# Disable queries that are not relevant for OpenSSL
+disable-default-queries: false
+
+# Custom query suites
+queries:
+  # Use security-extended for comprehensive security analysis
+  - uses: security-extended
+
+  # Add custom queries for cryptographic libraries
+  - name: security-and-quality
+    uses: security-and-quality
+
+  # Custom queries for OpenSSL-specific patterns
+  - name: custom-openssl-queries
+    uses: ./.github/codeql/custom-queries
+
+# Paths to exclude from analysis
+paths-ignore:
+  - "**/test/**"
+  - "**/tests/**"
+  - "**/demos/**"
+  - "**/fuzz/**"
+  - "**/external/**"
+  - "**/doc/**"
+  - "**/apps/**"
+  - "**/engines/**"
+  - "**/providers/legacy/**"
+
+# Paths to include in analysis (focus on core crypto/ssl code)
+paths:
+  - "crypto/**"
+  - "ssl/**"
+  - "include/**"
+  - "providers/fips/**"
+  - "providers/default/**"
+
+# Analysis configuration
+packs:
+  - codeql/cpp-queries
+  - codeql/cpp-security-extended
+
+# Build configuration
+build-mode: "autobuild"
+
+# Memory settings for large codebase
+memory: "8192"
+
+# Timeout settings
+timeout: "3600"
