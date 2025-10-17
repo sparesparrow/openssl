@@ -8,12 +8,8 @@ disable-default-queries: false
 
 # Custom query suites
 queries:
-  # Use security-extended for comprehensive security analysis
-  - uses: security-extended
-
-  # Add custom queries for cryptographic libraries
-  - name: security-and-quality
-    uses: security-and-quality
+  # Use security-and-quality for comprehensive security analysis
+  - uses: security-and-quality
 
   # Custom queries for OpenSSL-specific patterns
   - name: custom-openssl-queries
@@ -42,7 +38,6 @@ paths:
 # Analysis configuration
 packs:
   - codeql/cpp-queries
-  - codeql/cpp-security-extended
 
 # Build configuration
 build-mode: "autobuild"

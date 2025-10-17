@@ -56,7 +56,7 @@ jobs:
               uses: github/codeql-action/init@v3
               with:
                   languages: ${{ matrix.language }}
-                  queries: ${{ github.event.inputs.query-suites || 'security-extended' }}
+                  queries: ${{ github.event.inputs.query-suites || 'security-and-quality' }}
                   config-file: ./.github/codeql/codeql-config.yml
 
             - name: Install build dependencies
