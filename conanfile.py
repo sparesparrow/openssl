@@ -20,7 +20,7 @@ from pathlib import Path
 
 class OpenSSLConan(ConanFile):
     name = "openssl"
-    version = "4.0.0"
+    version = "4.0.0-dev"
 
     # Package metadata
     description = "OpenSSL FIPS 140-3 compliant cryptographic library"
@@ -207,10 +207,36 @@ class OpenSSLConan(ConanFile):
         copy(self, "*.odg", src=".", dst=self.export_sources_folder)
         copy(self, "*.def", src=".", dst=self.export_sources_folder)
 
+    def set_version(self):
+        """Parse version from VERSION.dat file"""
+        try:
+            version_file = os.path.join(self.recipe_folder, "VERSION.dat")
+            if os.path.exists(version_file):
+                version_content = load(self, version_file)
+                # Parse version from VERSION.dat format: MAJOR=4, MINOR=0, PATCH=0, PRE_RELEASE_TAG=dev
+                major = re.search(r'MAJOR=(\d+)', version_content).group(1)
+                minor = re.search(r'MINOR=(\d+)', version_content).group(1)
+                patch = re.search(r'PATCH=(\d+)', version_content).group(1)
+                pre_release = re.search(r'PRE_RELEASE_TAG=([^\n\r]*)', version_content).group(1)
+                
+                if pre_release and pre_release.strip():
+                    self.version = f"{major}.{minor}.{patch}-{pre_release.strip()}"
+                else:
+                    self.version = f"{major}.{minor}.{patch}"
+                
+                self.output.info(f"Parsed version from VERSION.dat: {self.version}")
+            else:
+                self.output.warning("VERSION.dat not found, using default version")
+        except Exception as e:
+            self.output.warning(f"Failed to parse version from VERSION.dat: {e}")
+
     def source(self):
-        """Get source code"""
+        """Get source code and configure for cloudsmth remote"""
         # Source is already available in the repository
-        pass
+        self.output.info("Source code available in repository")
+        
+        # Configure for cloudsmth remote caching
+        self._configure_source_for_cloudsmth()
 
     def _get_configure_args(self):
         """Build configure arguments based on options"""
@@ -322,6 +348,9 @@ class OpenSSLConan(ConanFile):
         # Generate SBOM
         self._generate_sbom()
         
+        # Configure for cloudsmth remote caching
+        self._configure_package_for_cloudsmth()
+        
         self.output.info("Packaging OpenSSL completed")
 
     def _generate_sbom(self):
@@ -375,6 +404,47 @@ class OpenSSLConan(ConanFile):
             
         except Exception as e:
             self.output.warn(f"Failed to generate SBOM: {e}")
+
+    def _configure_source_for_cloudsmth(self):
+        """Configure source for cloudsmth remote caching"""
+        try:
+            # Set up environment for cloudsmth remote
+            self.output.info("Configuring source for cloudsmth remote caching")
+            
+            # Set environment variables for cloudsmth remote
+            os.environ["CONAN_REMOTES"] = "cloudsmth,conancenter"
+            os.environ["CONAN_CACHE_ENABLED"] = "1"
+            
+            self.output.info("Source configured for cloudsmth remote")
+            
+        except Exception as e:
+            self.output.warning(f"Failed to configure source for cloudsmth: {e}")
+
+    def _configure_package_for_cloudsmth(self):
+        """Configure package for cloudsmth remote caching"""
+        try:
+            # Create package metadata for cloudsmth caching
+            package_metadata = {
+                "remote": "cloudsmth",
+                "cache_enabled": True,
+                "build_type": str(self.settings.build_type),
+                "arch": str(self.settings.arch),
+                "os": str(self.settings.os),
+                "compiler": str(self.settings.compiler),
+                "version": self.version,
+                "shared": self.options.shared,
+                "fips_enabled": self.options.enable_fips,
+                "timestamp": str(uuid.uuid4())
+            }
+            
+            # Save metadata for cloudsmth remote
+            metadata_path = os.path.join(self.package_folder, "cloudsmth_metadata.json")
+            save(self, metadata_path, json.dumps(package_metadata, indent=2))
+            
+            self.output.info("Package configured for cloudsmth remote caching")
+            
+        except Exception as e:
+            self.output.warning(f"Failed to configure package for cloudsmth: {e}")
 
     def package_info(self):
         """Package info for OpenSSL"""
