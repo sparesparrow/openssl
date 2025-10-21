@@ -408,29 +408,350 @@ strategy:
 4. **Test with multiple profiles**
 5. **Submit a pull request**
 
+## Troubleshooting
+
+### Common Issues and Solutions
+
+#### Build Failures
+
+**Error: "Missing system dependencies"**
+```bash
+# On Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install build-essential cmake git perl libperl-dev
+
+# On CentOS/RHEL
+sudo yum install gcc gcc-c++ make cmake git perl perl-devel
+
+# On macOS
+xcode-select --install
+brew install cmake perl
+
+# On Windows
+# Install Visual Studio 2022 or Visual Studio Build Tools
+# Install CMake and Perl (Strawberry Perl recommended)
+```
+
+**Error: "CMake configuration failed"**
+```bash
+# Clean build directory
+rm -rf build/
+
+# Regenerate CMake cache
+conan install . --build missing
+
+# Check CMake version (requires 3.15+)
+cmake --version
+```
+
+**Error: "FIPS module validation failed"**
+```bash
+# Ensure FIPS profile is used
+conan create . --profile=linux-fips
+
+# Check FIPS-specific requirements
+conan create . --profile=linux-fips -o openssl:enable_tests=True
+```
+
+#### Dependency Issues
+
+**Error: "Package not found in remotes"**
+```bash
+# Add required remotes
+conan remote add conancenter https://center.conan.io
+conan remote add cloudsmith https://cloudsmith.io/sparesparrow/openssl/
+
+# Update remote information
+conan remote update conancenter
+```
+
+**Error: "Incompatible compiler version"**
+```bash
+# Check compiler requirements
+conan profile show
+
+# Update compiler if needed
+# GCC 7+ required for FIPS mode
+# Visual Studio 2019+ recommended
+```
+
+#### Performance Issues
+
+**Error: "Build takes too long"**
+```bash
+# Use optimized profile
+conan create . --profile=linux-gcc-release
+
+# Enable parallel builds
+conan create . --profile=linux-gcc-release -j$(nproc)
+
+# Clean cache for fresh start
+conan cache clean --source --build --download
+```
+
+### Platform-Specific Issues
+
+#### Linux
+
+**Error: "libperl.so not found"**
+```bash
+# Install libperl-dev
+sudo apt-get install libperl-dev
+
+# Check Perl installation
+perl -v
+```
+
+**Error: "CMake cannot find OpenSSL"**
+```bash
+# Avoid system OpenSSL conflicts
+export OPENSSL_ROOT_DIR=/usr/local
+# Or use containerized builds
+```
+
+#### Windows
+
+**Error: "MSVC compiler not found"**
+```bash
+# Install Visual Studio Build Tools
+# Ensure MSVC 2019+ is in PATH
+# Check with: cl
+```
+
+**Error: "Perl not found"**
+```bash
+# Install Strawberry Perl
+# Add to PATH: C:\Strawberry\perl\bin
+```
+
+#### macOS
+
+**Error: "Command Line Tools not installed"**
+```bash
+xcode-select --install
+```
+
+**Error: "Architecture mismatch"**
+```bash
+# Check target architecture
+conan profile show
+
+# Use correct profile for ARM64
+conan create . --profile=macos-clang
+```
+
+### Debug and Diagnostics
+
+#### Verbose Output
+```bash
+# Enable verbose Conan output
+conan create . --profile=linux-gcc-release -v
+
+# Debug CMake configuration
+conan install . --build missing -if build -v
+cd build && cmake .. -DCMAKE_BUILD_TYPE=Debug
+```
+
+#### Log Analysis
+```bash
+# Check Conan logs
+conan cache logs openssl/4.0.0-dev@user/stable
+
+# Check build logs in CI
+# Navigate to Actions tab in GitHub
+```
+
+#### Cache Issues
+```bash
+# Clean all caches
+conan cache clean --all
+
+# Clean specific package
+conan cache clean openssl/4.0.0-dev@user/stable
+
+# Reset profile cache
+conan profile detect --force
+```
+
 ## Migration from Legacy Builds
 
-### Gradual Migration
+### Migration Guide
 
-The repository supports gradual migration from legacy builds:
+This section provides a comprehensive guide for migrating from traditional OpenSSL builds to Conan-based builds.
 
-1. **Phase 1**: Feature flags and parallel execution
-2. **Phase 2**: Validation and comparison
-3. **Phase 3**: Full migration to Conan CI
+#### Assessment Phase
 
-### Migration Controller
+1. **Identify Current Build Process**
+   ```bash
+   # Document current build commands
+   ./Configure --prefix=/usr/local --openssldir=/etc/ssl
+   make
+   make install
 
-Use the migration controller to manage the transition:
+   # Or traditional CMake
+   mkdir build && cd build
+   cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+   make install
+   ```
 
-```bash
-# Test with Conan CI only
-# Add label: conan-only
+2. **Inventory Dependencies**
+   ```bash
+   # List system dependencies
+   ldd /usr/local/lib/libssl.so
+   ldd /usr/local/lib/libcrypto.so
+   ```
 
-# Compare both systems
-# Add label: both-ci
+3. **Document Configuration**
+   - Compiler versions and flags
+   - Installation paths
+   - Environment variables
+   - Platform-specific settings
 
-# Use legacy CI only
-# Add label: legacy-only
-```
+#### Planning Phase
+
+1. **Choose Migration Strategy**
+   - **Parallel**: Run both systems simultaneously
+   - **Gradual**: Phase out legacy builds incrementally
+   - **Big Bang**: Complete switch to Conan
+
+2. **Identify Conan Profiles**
+   ```bash
+   # Map legacy configurations to Conan profiles
+   # GCC release -> linux-gcc-release
+   # MSVC debug -> windows-msvc-debug
+   # FIPS builds -> linux-fips
+   ```
+
+3. **Plan Testing Strategy**
+   - Unit tests for functionality
+   - Integration tests for compatibility
+   - Performance benchmarks
+   - Security validation
+
+#### Implementation Phase
+
+1. **Install Conan**
+   ```bash
+   pip install conan
+   conan profile detect --force
+   ```
+
+2. **Create Test Package**
+   ```bash
+   # Test basic functionality
+   conan create . --profile=linux-gcc-release
+
+   # Verify installation
+   conan test test_package
+   ```
+
+3. **Compare Outputs**
+   ```bash
+   # Traditional build
+   ./Configure --prefix=/tmp/openssl-traditional
+   make && make install
+
+   # Conan build
+   conan create . --profile=linux-gcc-release \
+     --output-folder=/tmp/openssl-conan
+
+   # Compare
+   diff -r /tmp/openssl-traditional /tmp/openssl-conan
+   ```
+
+4. **Update Build Scripts**
+   ```bash
+   # Replace traditional commands with Conan
+   # Old:
+   # ./Configure && make && make install
+
+   # New:
+   conan create . --profile=production
+   ```
+
+#### Validation Phase
+
+1. **Functional Testing**
+   ```bash
+   # Test cryptographic operations
+   openssl speed aes-256-cbc
+
+   # Test SSL/TLS
+   openssl s_client -connect google.com:443
+
+   # Test FIPS mode (if applicable)
+   openssl md5 /dev/null  # Should fail in FIPS mode
+   ```
+
+2. **Compatibility Testing**
+   ```bash
+   # Test with existing applications
+   # Compile and run consumer projects
+   conan test consumer_test/
+   ```
+
+3. **Performance Validation**
+   ```bash
+   # Benchmark comparison
+   openssl speed -elapsed aes-256-cbc
+   openssl speed -elapsed sha256
+   ```
+
+#### Rollback Strategy
+
+1. **Maintain Legacy Builds**
+   - Keep traditional build scripts
+   - Preserve existing installations
+   - Plan rollback procedures
+
+2. **Gradual Migration Controller**
+   ```bash
+   # Use migration labels in CI
+   # conan-only: Test Conan builds only
+   # both-ci: Run both traditional and Conan
+   # legacy-only: Traditional builds only
+   ```
+
+3. **Rollback Commands**
+   ```bash
+   # Quick rollback to legacy
+   ./Configure --prefix=/usr/local
+   make clean
+   make && make install
+
+   # Restore from backup
+   cp -r /backup/openssl-backup/* /usr/local/
+   ```
+
+#### Post-Migration
+
+1. **Update Documentation**
+   - Update build instructions
+   - Document new procedures
+   - Update team training
+
+2. **Monitor Performance**
+   - Track build times
+   - Monitor cache hit rates
+   - Watch for regressions
+
+3. **Gather Feedback**
+   - Collect team experiences
+   - Document lessons learned
+   - Plan improvements
+
+### Migration Checklist
+
+- [ ] Document current build process
+- [ ] Install Conan and verify setup
+- [ ] Create equivalent Conan profiles
+- [ ] Test package creation
+- [ ] Compare build outputs
+- [ ] Validate functionality
+- [ ] Test consumer applications
+- [ ] Update build scripts
+- [ ] Plan rollback strategy
+- [ ] Train team members
+- [ ] Monitor and optimize
 
 This ensures a smooth transition with minimal risk and maximum validation.

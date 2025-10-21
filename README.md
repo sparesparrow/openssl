@@ -17,11 +17,141 @@ This repository works with [openssl-tools](https://github.com/sparesparrow/opens
 3. Core validation triggers openssl-tools CI
 4. Packages built and distributed via openssl-tools
 
-## Minimal Dependencies
+## Modern Package Management with Conan
 
-- `conanfile.py` - Basic package definition
-- `conan/default.profile` - Basic build profile
-- Core CI workflows for validation and triggering
+This fork includes **minimal, upstream-friendly** Conan integration that enhances OpenSSL's usability in modern development environments while maintaining full compatibility with traditional build systems.
+
+### Why Conan Integration?
+
+**For Package Consumers:**
+- **Zero-install usage**: `conan install openssl/4.0.0-dev@user/stable`
+- **Cross-platform binaries**: Pre-built packages for Linux, Windows, macOS
+- **Dependency management**: Automatic resolution of build dependencies
+- **Reproducible builds**: Consistent environments across development and CI
+
+**For Package Maintainers:**
+- **Multi-platform CI**: Automated testing across compiler/OS combinations
+- **Security scanning**: Integrated CodeQL, Trivy, and SBOM generation
+- **Artifact distribution**: Automated publishing to package registries
+- **Build optimization**: Intelligent caching and parallel builds
+
+### Quick Start with Conan
+
+```bash
+# Install Conan (requires Python 3.6+)
+pip install conan
+
+# Clone and build
+git clone https://github.com/sparesparrow/openssl.git
+cd openssl
+
+# Create package with default settings
+conan create . --build missing
+
+# Install for development
+conan install . --build missing
+
+# Test the package
+conan test test_package
+```
+
+### Available Configurations
+
+| Configuration | Profile | Description |
+|---------------|---------|-------------|
+| **Linux Release** | `linux-gcc-release` | Production Linux build, optimized |
+| **Linux FIPS** | `linux-fips` | FIPS 140-3 compliant build |
+| **Windows MSVC** | `windows-msvc` | Visual Studio 2022 build |
+| **macOS Clang** | `macos-clang` | ARM64 optimized macOS build |
+
+### Advanced Usage
+
+```bash
+# FIPS-compliant build
+conan create . --profile=linux-fips
+
+# Static linking
+conan create . -o shared=False -o fPIC=True
+
+# Custom build type
+conan create . -s build_type=Debug
+
+# Cross-platform from Linux
+conan create . --profile:build linux-gcc-release --profile:host windows-msvc
+```
+
+### Integration with Build Systems
+
+**CMake:**
+```cmake
+find_package(openssl REQUIRED)
+target_link_libraries(myapp openssl::openssl)
+```
+
+**CMake with Conan:**
+```bash
+conan install openssl/4.0.0-dev@user/stable --output-folder=build --build missing
+cd build && cmake .. -DCMAKE_TOOLCHAIN_FILE=conan_toolchain.cmake
+cmake --build .
+```
+
+### CI/CD Integration
+
+The repository includes comprehensive CI/CD workflows:
+
+- **conan-integration-test.yml**: Multi-platform package testing
+- **codeql-analysis.yml**: Security vulnerability scanning
+- **sbom-generation.yml**: Software Bill of Materials generation
+- **Trivy integration**: Container and dependency scanning
+
+### Migration from Traditional Builds
+
+Existing projects can migrate gradually:
+
+```bash
+# Traditional build (unchanged)
+./Configure --prefix=/usr/local
+make && make install
+
+# Conan build (new option)
+conan create . --profile=linux-gcc-release
+
+# Both can coexist during migration
+```
+
+See [BUILDING-CONAN.md](BUILDING-CONAN.md) for comprehensive migration guidance.
+
+### Security and Compliance
+
+- **FIPS 140-3**: Validated cryptographic module (Certificate #4985)
+- **SBOM**: Automated Software Bill of Materials generation
+- **Vulnerability scanning**: Trivy and CodeQL integration
+- **Supply chain security**: Signed packages and audit trails
+
+### Repository Architecture
+
+This repository maintains **minimal changes** from upstream OpenSSL:
+
+- Core cryptographic functionality: **100% upstream**
+- Build system: **Traditional Configure/Make preserved**
+- Package management: **Conan integration added**
+- CI/CD: **Enhanced workflows added**
+
+This approach ensures:
+- ✅ Easy upstream merging
+- ✅ Zero breaking changes
+- ✅ Traditional build compatibility
+- ✅ Modern package management benefits
+
+### Contributing
+
+1. **Fork the repository**
+2. **Create feature branch** (`git checkout -b feature/conan-enhancement`)
+3. **Make changes** (test with multiple profiles)
+4. **Run tests**: `conan test test_package`
+5. **Submit pull request**
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
 ---
 

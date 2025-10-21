@@ -20,7 +20,7 @@ from pathlib import Path
 
 class OpenSSLConan(ConanFile):
     name = "openssl"
-    version = "3.3.0"
+    version = "4.0.0-dev"
 
     # Package metadata
     description = "OpenSSL FIPS 140-3 compliant cryptographic library"

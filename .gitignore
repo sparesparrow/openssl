@@ -450,3 +450,18 @@ build/
 test_package/build/
 artifactory.token
 
+# Build artifacts (prevent committing generated files)
+build.ninja
+build.ninja.in
+*.ninja.new
+Configurations/build.ninja.tmpl
+Configurations/ninja.tmpl
+test-*.sh
+*.ninja.tmpl
+
+# Additional build system artifacts
+Makefile.bak
+config.log
+config.status
+libtool
+

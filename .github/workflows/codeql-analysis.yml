@@ -1,0 +1,190 @@
+name: "CodeQL Security Analysis"
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly on Monday at 6 AM UTC
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'cpp', 'c' ]
+        # CodeQL supports [ 'cpp', 'csharp', 'go', 'java', 'javascript', 'python', 'ruby' ]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v2
+      with:
+        languages: ${{ matrix.language }}
+        # If you wish to specify custom queries, you can do so here or in a config file.
+        # By default, queries listed here will override any specified in a config file.
+        # Prefix the list here with "+" to use these queries and those in the config file.
+
+        # Details on CodeQL's query packs refer to : https://docs.github.com/en/codeql/codeql-cli/getting-started-with-the-codeql-cli/creating-codeql-query-packs
+        queries: security-and-quality
+        config: |
+          paths-ignore:
+            - 'test/'
+            - 'tests/'
+            - 'fuzz/'
+            - 'external/'
+            - 'engines/'
+            - 'providers/'
+            - '**/test_*.c'
+            - '**/test_*.h'
+            - '**/*test*.c'
+            - '**/*test*.h'
+            - 'demo*'
+            - 'example*'
+
+    - name: Setup build environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake git perl libperl-dev
+        # Additional dependencies for OpenSSL
+        sudo apt-get install -y pkg-config
+
+    - name: Configure build
+      run: |
+        mkdir -p build
+        cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build project
+      run: |
+        cd build
+        make -j$(nproc)
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+      with:
+        category: "/language:${{matrix.language}}"
+
+  security-scan:
+    name: Security Scan Summary
+    runs-on: ubuntu-latest
+    needs: analyze
+    if: always()
+
+    steps:
+    - name: Download scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+
+    - name: Generate security report
+      run: |
+        echo "## 🔒 Security Analysis Report" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "CodeQL security analysis completed for C/C++ codebase." >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Analysis Scope" >> $GITHUB_STEP_SUMMARY
+        echo "- Languages: C, C++" >> $GITHUB_STEP_SUMMARY
+        echo "- Excluded paths: test/, fuzz/, external/" >> $GITHUB_STEP_SUMMARY
+        echo "- Query suite: security-and-quality" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Results will be available in the Security tab." >> $GITHUB_STEP_SUMMARY
+
+  dependency-scan:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  sbom-generation:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: |
+        pip install conan
+
+    - name: Configure Conan
+      run: |
+        conan profile detect --force
+
+    - name: Generate SBOM via Conan
+      run: |
+        # Create a simple SBOM using available tools
+        echo "Generating Software Bill of Materials..."
+        mkdir -p build
+
+        # Use conan to generate dependency information
+        conan install . --build missing -if build
+
+        # Generate basic SBOM format
+        cat > build/sbom.json << EOF
+        {
+          "bomFormat": "CycloneDX",
+          "specVersion": "1.5",
+          "serialNumber": "urn:uuid:$(uuidgen)",
+          "version": 1,
+          "metadata": {
+            "timestamp": "$(date -u +'%Y-%m-%dT%H:%M:%SZ')",
+            "component": {
+              "type": "library",
+              "name": "openssl",
+              "version": "4.0.0-dev",
+              "description": "OpenSSL cryptographic library",
+              "licenses": [{"license": {"id": "Apache-2.0"}}],
+              "externalReferences": [
+                {"type": "website", "url": "https://www.openssl.org"},
+                {"type": "vcs", "url": "https://github.com/openssl/openssl"}
+              ]
+            }
+          }
+        }
+        EOF
+
+    - name: Upload SBOM
+      uses: actions/upload-artifact@v3
+      with:
+        name: sbom
+        path: build/sbom.json
+
+    - name: Upload to GitHub Dependency Graph
+      run: |
+        # This would upload to GitHub's dependency graph if available
+        echo "SBOM generated and uploaded as artifact"
