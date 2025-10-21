@@ -3991,7 +3991,7 @@ X509_STORE_CTX_set0_untrusted           4082	4_0_0	EXIST::FUNCTION:
 OPENSSL_hexchar2int                     4083	4_0_0	EXIST::FUNCTION:
 X509_STORE_set_ex_data                  4084	4_0_0	EXIST::FUNCTION:
 X509_STORE_get_ex_data                  4085	4_0_0	EXIST::FUNCTION:
-X509_STORE_get0_objects                 4086	4_0_0	EXIST::FUNCTION:
+X509_STORE_get0_objects                 4086	4_0_0	EXIST::FUNCTION:DEPRECATEDIN_4_0
 X509_OBJECT_get_type                    4087	4_0_0	EXIST::FUNCTION:
 X509_STORE_set_verify                   4088	4_0_0	EXIST::FUNCTION:
 X509_OBJECT_new                         4089	4_0_0	EXIST::FUNCTION:
@@ -5947,3 +5947,6 @@ CRYPTO_realloc_array                    ?	4_0_0	EXIST::FUNCTION:
 CRYPTO_clear_realloc_array              ?	4_0_0	EXIST::FUNCTION:
 CRYPTO_secure_malloc_array              ?	4_0_0	EXIST::FUNCTION:
 CRYPTO_secure_calloc                    ?	4_0_0	EXIST::FUNCTION:
+OPENSSL_posix_to_tm                     ?	4_0_0	EXIST::FUNCTION:
+OPENSSL_tm_to_posix                     ?	4_0_0	EXIST::FUNCTION:
+OPENSSL_timegm                          ?	4_0_0	EXIST::FUNCTION:
