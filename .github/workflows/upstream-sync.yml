@@ -31,7 +31,7 @@ jobs:
         run: |
           git fetch upstream
           git checkout -b sync-upstream-$(date +%Y%m%d-%H%M%S)
-          
+
           # Attempt merge
           if git merge upstream/master --no-edit; then
             echo "Clean merge successful"
@@ -42,5 +42,46 @@ jobs:
             echo "Merge conflicts detected - manual resolution needed"
             exit 1
           fi
-          
-          git push origin HEAD
+
+      - name: Check for Conflicts and Create PR
+        if: success()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { execSync } = require('child_process');
+            const fs = require('fs');
+
+            // Check for any remaining conflicts or changes
+            const status = execSync('git status --porcelain', { encoding: 'utf8' });
+            if (status.trim()) {
+              console.log('Changes detected, preparing PR...');
+
+              // Get commit details
+              const commitMsg = execSync('git log --format=%B -n 1', { encoding: 'utf8' }).trim();
+              const prTitle = `Upstream Sync: ${commitMsg}`;
+
+              // Create PR using GitHub API
+              const { Octokit } = require('@octokit/rest');
+              const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
+
+              const pr = await octokit.pulls.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: prTitle,
+                head: context.sha,
+                base: 'main',
+                body: `Automated upstream sync from openssl/openssl.\n\nChanges:\n${status}\n\nPlease review for compatibility with fork modifications.`
+              });
+
+              console.log(`PR created: ${pr.data.html_url}`);
+            } else {
+              console.log('No changes to sync.');
+            }
+
+      - name: Rollback on Failure
+        if: failure()
+        run: |
+          echo "Sync failed - performing rollback"
+          git reset --hard HEAD~1 || true
+          git branch -D sync-upstream-$(date +%Y%m%d-%H%M%S) || true
+          echo "Rollback completed - please resolve conflicts manually"

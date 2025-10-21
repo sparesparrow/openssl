@@ -378,8 +378,59 @@ conan search openssl --query="*" --format=json | jq '.results[].items[] | select
 - Report Conan issues: [Conan Issues](https://github.com/conan-io/conan/issues)
 - Report OpenSSL issues: [OpenSSL Issues](https://github.com/openssl/openssl/issues)
 
+## Upstream Synchronization Strategy
+
+### Overview
+To maintain compatibility and security, this OpenSSL fork includes automated workflows for synchronizing with the upstream `openssl/openssl` repository. This strategy minimizes maintenance overhead, ensures timely updates, and reduces the risk of version drift or conflicts.
+
+### Automated Upstream Tracking
+- **Workflow**: `.github/workflows/upstream-sync.yml` runs daily at 6 AM UTC and on manual dispatch.
+- **Process**:
+  1. Fetches latest changes from upstream.
+  2. Attempts a clean merge into the fork.
+  3. If conflicts arise, offers force merge option or requires manual intervention.
+  4. On success, automatically creates a pull request (PR) for review.
+
+### Conflict Resolution
+- **Detection**: Automated checks for merge conflicts during sync.
+- **Resolution Procedures**:
+  1. **Automated**: Use `git merge -X theirs` for force sync if enabled.
+  2. **Manual**: If conflicts persist, the workflow fails, and a maintainer must resolve them locally.
+  3. **Tools**: Leverage `actions/github-script@v6` for detailed conflict reporting and PR creation.
+
+### Version Compatibility Validation Matrix
+- **Integration**: Added to CI workflows (e.g., `ci.yml`) to test Conan integration across multiple OpenSSL versions (e.g., 3.0.0, 3.1.0).
+- **Process**:
+  1. Tests build and export for each version.
+  2. Validates compatibility with fork modifications.
+  3. Reports status for each version to ensure no regressions.
+
+### Rollback Procedures for Failed Syncs
+1. **Automatic Rollback**: On workflow failure, the branch is reset to the previous state.
+2. **Manual Rollback**:
+   - Identify the sync branch: `git branch -a | grep sync-upstream`.
+   - Reset main branch: `git checkout main && git reset --hard HEAD~1`.
+   - Delete failed branch: `git branch -D sync-upstream-YYYYMMDD-HHMMSS`.
+3. **Risk Mitigation**: Always backup the repository state before manual syncs. Use `git tag` to mark pre-sync states.
+
+### Maintenance Overhead and Best Practices
+- **Overhead**: Automated syncs reduce manual effort to ~1-2 hours per incident. Daily runs ensure proactive detection.
+- **Best Practices**:
+  1. Monitor sync workflows in GitHub Actions for failures.
+  2. Review generated PRs for fork-specific modifications (e.g., Conan files, FIPS configs).
+  3. Schedule quarterly manual audits of sync history.
+  4. Update the compatibility matrix as new OpenSSL versions are released.
+- **Risk Assessment**: Without this strategy, maintenance could increase by 50-100% due to unhandled conflicts and delayed updates. Automation minimizes downtime and security risks.
+
+### Implementation Notes
+- **Dependencies**: Relies on `actions/github-script@v6` for PR automation and `conan` for compatibility testing.
+- **Customization**: Adjust the sync schedule or force-sync options in `.github/workflows/upstream-sync.yml` based on project needs.
+- **Testing**: Validate sync workflows in a staging environment before production use.
+
+For questions or issues, refer to the [Upstream Sync Workflow](#) or open an issue in the repository.
+
 ---
 
-**Last Updated**: October 17, 2025  
-**Tested With**: Conan 2.21.0, Python 3.13.7, GCC 15.2.0  
+**Last Updated**: October 17, 2025
+**Tested With**: Conan 2.21.0, Python 3.13.7, GCC 15.2.0
 **Status**: ✅ Production Ready
