@@ -433,3 +433,10 @@ deactivate_conanrun.sh
 CMakePresets.json
 conan_toolchain.cmake
 conan.lock
+
+# Build artifacts (generated files)
+build.ninja*
+*.ninja.in
+*.ninja.new
+test-*.sh
+Configurations/*.ninja.tmpl
