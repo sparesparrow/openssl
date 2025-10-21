@@ -1,0 +1,65 @@
+name: "OpenSSL Security CodeQL Configuration"
+
+disable-default-queries: false
+
+queries:
+  # Use the security-and-quality query suite as baseline
+  - uses: security-and-quality
+
+  # Add OpenSSL-specific custom queries
+  - name: "OpenSSL Security Checks"
+    uses: "./.github/codeql/openssl-security.ql"
+
+  # C/C++ specific security queries
+  - uses: security-experimental/cpp/queries
+  - uses: security-experimental/c/queries
+
+paths-ignore:
+  - 'test/'
+  - 'tests/'
+  - 'fuzz/'
+  - 'external/'
+  - 'engines/'
+  - 'providers/'
+  - '**/test_*.c'
+  - '**/test_*.h'
+  - '**/*test*.c'
+  - '**/*test*.h'
+  - 'demo*'
+  - 'example*'
+  - 'doc/'
+  - 'docs/'
+  - 'util/'
+  - 'tools/'
+  - 'apps/'
+  - 'VMS/'
+  - 'ms/'
+  - 'Configurations/'
+
+paths:
+  - 'crypto/'
+  - 'ssl/'
+  - 'include/'
+  - 'providers/common/'
+  - 'engines/'
+
+# Disable queries that are too noisy for OpenSSL codebase
+query-filters:
+  - exclude:
+      problem.severity: "info"
+      tags: "documentation"
+  - exclude:
+      problem.severity: "info"
+      tags: "style"
+
+# Custom query settings for OpenSSL
+primary-language: "cpp"
+
+# Additional configuration for better OpenSSL analysis
+options:
+  threads: 4
+  timeout: "30m"
+  max-paths: 1000
+
+# Security severity thresholds
+security-severity-threshold: "high"
