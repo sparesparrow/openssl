@@ -5,7 +5,7 @@ import os
 
 class OpenSSLConan(ConanFile):
     name = "openssl"
-    
+
     def set_version(self):
         """Read version from VERSION.dat file"""
         version_file = os.path.join(self.recipe_folder, "VERSION.dat")
@@ -23,7 +23,7 @@ class OpenSSLConan(ConanFile):
                         patch = line.split("=")[1].strip()
                     elif line.startswith("PRE_RELEASE_TAG="):
                         prerelease = line.split("=")[1].strip().strip('"')
-                
+
                 # Build version string
                 version = f"{major}.{minor}.{patch}"
                 if prerelease and prerelease != "":
@@ -158,37 +158,37 @@ class OpenSSLConan(ConanFile):
     def source(self):
         # In-tree, zdroje již přítomny
         pass
-    
+
     def build(self):
         # Použití python_requires orchestrace
         python_req = self.python_requires["openssl-tools"]
         python_req.module.build_openssl(self)
-    
+
     def package(self):
         """Package OpenSSL properly to package folder"""
         # Install to a staging directory first
         staging = os.path.join(self.build_folder, "staging")
         self.run(f"make install DESTDIR={staging}", cwd=self.source_folder)
-        
+
         # Copy from staging to package folder
         install_prefix = os.path.join(staging, "usr/local/ssl")
-        
+
         # Libraries
-        copy(self, "*.so*", src=os.path.join(install_prefix, "lib"), 
+        copy(self, "*.so*", src=os.path.join(install_prefix, "lib"),
              dst=os.path.join(self.package_folder, "lib"), keep_path=False)
-        copy(self, "*.a", src=os.path.join(install_prefix, "lib"), 
+        copy(self, "*.a", src=os.path.join(install_prefix, "lib"),
              dst=os.path.join(self.package_folder, "lib"), keep_path=False)
-        
+
         # Headers
-        copy(self, "*.h", src=os.path.join(install_prefix, "include"), 
+        copy(self, "*.h", src=os.path.join(install_prefix, "include"),
              dst=os.path.join(self.package_folder, "include"), keep_path=True)
-        
+
         # Binaries
-        copy(self, "openssl", src=os.path.join(install_prefix, "bin"), 
+        copy(self, "openssl", src=os.path.join(install_prefix, "bin"),
              dst=os.path.join(self.package_folder, "bin"), keep_path=False)
-        
+
         # License
-        copy(self, "LICENSE.txt", src=self.source_folder, 
+        copy(self, "LICENSE.txt", src=self.source_folder,
              dst=os.path.join(self.package_folder, "licenses"))
 
         self.output.info("Packaging OpenSSL completed")
@@ -197,15 +197,15 @@ class OpenSSLConan(ConanFile):
         """Proper package info for CMake integration"""
         self.cpp_info.set_property("cmake_file_name", "OpenSSL")
         self.cpp_info.set_property("cmake_target_name", "OpenSSL::OpenSSL")
-        
+
         # Libraries
         self.cpp_info.libs = ["ssl", "crypto"]
-        
+
         # Paths
         self.cpp_info.bindirs = ["bin"]
         self.cpp_info.includedirs = ["include"]
         self.cpp_info.libdirs = ["lib"]
-        
+
         # System dependencies
         if self.settings.os == "Linux":
             self.cpp_info.system_libs.extend(["dl", "pthread"])
@@ -213,6 +213,6 @@ class OpenSSLConan(ConanFile):
             self.cpp_info.system_libs.extend(["ws2_32", "gdi32", "advapi32", "crypt32", "user32"])
         elif self.settings.os == "Macos":
             self.cpp_info.frameworks.append("Security")
-        
+
         # Environment
         self.runenv_info.prepend_path("PATH", os.path.join(self.package_folder, "bin"))
