@@ -151,6 +151,19 @@ OpenSSL for production use.
     $ make
     $ make test
 
+### Using Ninja (Alternative Build System)
+
+OpenSSL can generate Ninja build files instead of Makefiles for faster
+parallel builds, especially on Windows:
+
+    $ ./Configure linux-x86_64 --format=ninja
+    $ ninja -j
+
+Ninja automatically generates `compile_commands.json` for IDE integration.
+Install Ninja from https://ninja-build.org/ or your package manager.
+
+On Windows, Ninja enables parallel builds with MSVC (nmake doesn't support this).
+
 ### OpenVMS
 
 Use the following commands to build OpenSSL:

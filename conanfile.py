@@ -1,14 +1,7 @@
-#!/usr/bin/env python3
-"""
-OpenSSL Conan Package Recipe
-Minimal implementation for upstream integration
-"""
-
 from conan import ConanFile
-from conan.errors import ConanInvalidConfiguration
+from conan.tools.gnu import Autotools
 from conan.tools.files import copy
 import os
-
 
 class OpenSSLConan(ConanFile):
     name = "openssl"
@@ -162,35 +155,15 @@ class OpenSSLConan(ConanFile):
         copy(self, "*.plantuml", src=".", dst=self.export_sources_folder)
         copy(self, "*.odg", src=".", dst=self.export_sources_folder)
         copy(self, "*.def", src=".", dst=self.export_sources_folder)
-
     def source(self):
-        """Get source code"""
-        # Source is already available in the repository
+        # In-tree, zdroje již přítomny
         pass
-
+    
     def build(self):
-        """Build OpenSSL using traditional Configure/Make"""
-        # Use OpenSSL's traditional build system (not CMake)
-        self.output.info("Building OpenSSL using traditional Configure/Make build system")
-
-        # Configure OpenSSL
-        configure_cmd = "./Configure linux-x86_64 --prefix=/usr/local/ssl"
-        if not self.options.shared:
-            configure_cmd += " no-shared"
-        if self.options.fPIC:
-            configure_cmd += " -fPIC"
-
-        self.run(configure_cmd, cwd=self.source_folder)
-
-        # Build OpenSSL
-        jobs = os.getenv("CONAN_CPU_COUNT", "1")
-        self.run(f"make -j{jobs}", cwd=self.source_folder)
-
-        # Run basic tests if enabled
-        # if self.options.enable_fips:
-        #     self.output.info("Running basic OpenSSL tests")
-        #     self.run("make test", cwd=self.source_folder)
-
+        # Použití python_requires orchestrace
+        python_req = self.python_requires["openssl-tools"]
+        python_req.module.build_openssl(self)
+    
     def package(self):
         """Package OpenSSL properly to package folder"""
         # Install to a staging directory first

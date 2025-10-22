@@ -34,8 +34,12 @@ OpenSSL 3.6
 
 ### Major changes between OpenSSL 3.5 and OpenSSL 3.6 [under development]
 
-This release incorporates the following potentially significant or incompatible
+This release incorporates the following potentially significant or incompatible                                                                              
 changes:
+
+  * Added Ninja build system support via `--format=ninja` option for faster
+    parallel builds, especially on Windows. Ninja automatically generates
+    `compile_commands.json` for IDE integration.
 
   * Added FIPS 140-3 PCT on DH key generation.
 

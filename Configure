@@ -27,7 +27,7 @@ use OpenSSL::config;
 my $orig_death_handler = $SIG{__DIE__};
 $SIG{__DIE__} = \&death_handler;
 
-my $usage="Usage: Configure [no-<feature> ...] [enable-<feature> ...] [-Dxxx] [-lxxx] [-Lxxx] [-fxxx] [-Kxxx] [no-hw-xxx|no-hw] [[no-]threads] [[no-]thread-pool] [[no-]default-thread-pool] [[no-]shared] [[no-]zlib|zlib-dynamic] [no-asm] [no-egd] [sctp] [386] [--prefix=DIR] [--openssldir=OPENSSLDIR] [--with-xxx[=vvv]] [--config=FILE] [--help] os/compiler[:flags]\n";
+my $usage="Usage: Configure [no-<feature> ...] [enable-<feature> ...] [-Dxxx] [-lxxx] [-Lxxx] [-fxxx] [-Kxxx] [no-hw-xxx|no-hw] [[no-]threads] [[no-]thread-pool] [[no-]default-thread-pool] [[no-]shared] [[no-]zlib|zlib-dynamic] [no-asm] [no-egd] [sctp] [386] [--prefix=DIR] [--openssldir=OPENSSLDIR] [--with-xxx[=vvv]] [--config=FILE] [--format=FORMAT] [--help] os/compiler[:flags]\n";
 
 my $banner = <<"EOF";
 
@@ -835,6 +835,7 @@ $config{openssl_sys_defines}=[];
 $config{openssl_feature_defines}=[];
 $config{options}="";
 $config{build_type} = "release";
+my $build_format = "makefile";
 my $target="";
 
 my %cmdvars = ();               # Stores FOO='blah' type arguments
@@ -1024,6 +1025,12 @@ while (@argvcopy)
         elsif (/^--pgo$/)
                 {
                 $config{build_type} = "pgo";
+                }
+        elsif (/^--format=(.*)$/)
+                {
+                $build_format = $1;
+                die "Unknown build format: $build_format"
+                        unless $build_format =~ /^(makefile|ninja)$/;
                 }
         elsif (/^386$/)
                 { $config{processor}=386; }
@@ -1536,7 +1543,17 @@ if (grep { $_ =~ /(?:^|\s)-static(?:\s|$)/ } @{$config{LDFLAGS}}) {
 }
 
 # Allow overriding the build file name
-$config{build_file} = env('BUILDFILE') || $target{build_file} || "Makefile";
+if ($build_format eq "ninja") {
+    $config{build_file} = env('BUILDFILE') || "build.ninja";
+    $config{build_command} = "ninja";
+    # Override build_scheme to use ninja template instead of unix template
+    $target{build_scheme} = [ "unified", "ninja" ];
+    # Override build_file_templates to exclude common0.tmpl
+    $config{build_file_templates} = [ "Configurations/ninja.tmpl" ];
+} else {
+    $config{build_file} = env('BUILDFILE') || $target{build_file} || "Makefile";
+    $config{build_command} = "make";
+}
 
 # Make sure build_scheme is consistent.
 $target{build_scheme} = [ $target{build_scheme} ]
