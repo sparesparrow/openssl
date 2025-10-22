@@ -52,9 +52,8 @@ class OpenSSLConan(ConanFile):
     }
 
     requires = [
-        "openssl-base/1.0.1@sparesparrow/stable",
-        "openssl-tools/1.2.4@sparesparrow/stable",
-        "openssl-fips-data/140-3.2@sparesparrow/stable"
+        "openssl-profiles/2.0.0@sparesparrow/stable",  # Merged base + fips
+        "openssl-tools/1.2.4@sparesparrow/stable"
     ]
 
     def configure(self):
