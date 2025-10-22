@@ -1,157 +1,161 @@
 name: Conan Integration Test
 
 on:
-  push:
-    branches: [main, chore/minimal-conan-upstream-clean]
-    paths:
-      - 'conanfile.py'
-      - 'test_package/**'
-      - '.github/workflows/conan-integration-test.yml'
-  pull_request:
-    branches: [main]
+    push:
+        branches: [main, chore/minimal-conan-upstream-clean]
+        paths:
+            - "conanfile.py"
+            - "test_package/**"
+            - ".github/workflows/conan-integration-test.yml"
+    pull_request:
+        branches: [main]
 
 jobs:
-  test-conan-package:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-22.04
-            profile: linux-gcc11
-          - os: windows-2022
-            profile: windows-msvc193
-          - os: macos-13
-            profile: macos-arm64
-    
-    runs-on: ${{ matrix.os }}
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      
-      - name: Install Conan
-        run: |
-          python -m pip install --upgrade pip
-          pip install conan>=2.0
-      
-      - name: Detect Conan profile
-        run: conan profile detect --force
-      
-      - name: Test package creation
-        run: |
-          conan create . --build=missing
-      
-      - name: Test with FIPS (Linux only)
-        if: matrix.os == 'ubuntu-22.04'
-        run: |
-          conan create . -o enable_fips=True --build=missing
-      
-      - name: Verify binary works
-        run: |
-          conan install --requires=openssl/[*] --deployer=full_deploy
-          if [ "${{ matrix.os }}" = "windows-2022" ]; then
-            ./full_deploy/host/*/openssl.exe version
-          else
-            ./full_deploy/host/*/openssl version
-          fi
-        shell: bash
+    test-conan-package:
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - os: ubuntu-22.04
+                      profile: linux-gcc11
+                    - os: windows-2022
+                      profile: windows-msvc193
+                    - os: macos-13
+                      profile: macos-arm64
 
-  test-with-openssl-tools:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          path: openssl
-      
-      - uses: actions/checkout@v4
-        with:
-          repository: sparesparrow/openssl-tools
-          path: openssl-tools
-      
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      
-      - name: Install Conan and extensions
-        run: |
-          pip install conan>=2.0
-          conan profile detect --force
-          cd openssl-tools
-          ./install-extensions.sh
-      
-      - name: Test with custom commands
-        run: |
-          cd openssl
-          conan openssl:build --help
-          conan openssl:graph --help
-      
-      - name: Export as python_requires test
-        run: |
-          cd openssl-tools
-          conan export . openssl-tools/1.2.0@
-          cd ../openssl
-          # Add python_requires line temporarily
-          echo "    python_requires = 'openssl-tools/1.2.0'" >> conanfile.py
-          conan create . --build=missing
+        runs-on: ${{ matrix.os }}
 
-  docs-and-examples:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Verify documentation
-        run: |
-          # Check required documentation files
-          test -f README-CONAN.md || (echo "Missing README-CONAN.md" && exit 1)
-          test -f BUILDING-CONAN.md || (echo "Missing BUILDING-CONAN.md" && exit 1)
-          test -d test_package || (echo "Missing test_package/" && exit 1)
-          echo "✓ All required documentation present"
-      
-      - name: Test example consumer
-        run: |
-          mkdir -p example-consumer
-          cd example-consumer
-          
-          cat > conanfile.txt << 'EOF'
-          [requires]
-          openssl/[*]
-          
-          [generators]
-          CMakeToolchain
-          CMakeDeps
-          EOF
-          
-          cat > CMakeLists.txt << 'EOF'
-          cmake_minimum_required(VERSION 3.15)
-          project(openssl_consumer)
-          
-          find_package(OpenSSL REQUIRED)
-          
-          add_executable(test_openssl test.cpp)
-          target_link_libraries(test_openssl OpenSSL::SSL OpenSSL::Crypto)
-          EOF
-          
-          cat > test.cpp << 'EOF'
-          #include <openssl/opensslv.h>
-          #include <iostream>
-          
-          int main() {
-              std::cout << "OpenSSL version: " << OPENSSL_VERSION_TEXT << std::endl;
-              return 0;
-          }
-          EOF
-          
-          # Install dependencies
-          pip install conan>=2.0
-          conan profile detect --force
-          conan install . --build=missing
-          
-          # Build and test
-          cmake --preset conan-default
-          cmake --build --preset conan-release
-          echo "✓ Example consumer built successfully"
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.11"
+
+            - name: Install Conan
+              run: |
+                  python -m pip install --upgrade pip
+                  pip install conan>=2.0
+
+            - name: Detect Conan profile
+              run: conan profile detect --force
+
+            - name: Test package creation
+              run: |
+                  conan create . --build=missing
+
+            - name: Test with FIPS (Linux only)
+              if: matrix.os == 'ubuntu-22.04'
+              run: |
+                  conan create . -o enable_fips=True --build=missing
+
+            - name: Verify binary works
+              run: |
+                  conan install --requires=openssl/[*] --deployer=full_deploy
+                  if [ "${{ matrix.os }}" = "windows-2022" ]; then
+                    ./full_deploy/host/*/openssl.exe version
+                  else
+                    ./full_deploy/host/*/openssl version
+                  fi
+              shell: bash
+
+    test-with-openssl-tools:
+        runs-on: ubuntu-22.04
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  path: openssl
+
+            - uses: actions/checkout@v4
+              with:
+                  repository: sparesparrow/openssl-tools
+                  path: openssl-tools
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.11"
+
+            - name: Install Conan and extensions
+              run: |
+                  pip install conan>=2.0
+                  conan profile detect --force
+                  cd openssl-tools
+                  ./install-extensions.sh
+
+            - name: Test with custom commands
+              run: |
+                  cd openssl
+                  conan openssl:build --help
+                  conan openssl:graph --help
+
+            - name: Export as python_requires test
+              run: |
+                  cd openssl-tools
+                  conan export . openssl-tools/1.2.0@
+                  cd ../openssl
+                  # Add python_requires line temporarily
+                  echo "    python_requires = 'openssl-tools/1.2.0'" >> conanfile.py
+                  conan create . --build=missing
+
+    docs-and-examples:
+        runs-on: ubuntu-22.04
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Verify documentation
+              run: |
+                  # Check required documentation files
+                  test -f README-CONAN.md || (echo "Missing README-CONAN.md" && exit 1)
+                  test -f BUILDING-CONAN.md || (echo "Missing BUILDING-CONAN.md" && exit 1)
+                  test -d test_package || (echo "Missing test_package/" && exit 1)
+                  echo "✓ All required documentation present"
+
+            - name: Test example consumer
+              run: |
+                  mkdir -p example-consumer
+                  cd example-consumer
+
+                  cat > conanfile.txt << 'EOF'
+                  [requires]
+                  openssl/[*]
+
+                  [generators]
+                  CMakeToolchain
+                  CMakeDeps
+                  EOF
+
+                  cat > CMakeLists.txt << 'EOF'
+                  cmake_minimum_required(VERSION 3.15)
+                  project(openssl_consumer)
+
+                  find_package(OpenSSL REQUIRED)
+
+                  add_executable(test_openssl test.cpp)
+                  target_link_libraries(test_openssl OpenSSL::SSL OpenSSL::Crypto)
+                  EOF
+
+                  cat > test.cpp << 'EOF'
+                  #include <openssl/opensslv.h>
+                  #include <iostream>
+
+                  int main() {
+                      std::cout << "OpenSSL version: " << OPENSSL_VERSION_TEXT << std::endl;
+                      return 0;
+                  }
+                  EOF
+
+                  # Install dependencies
+                  pip install conan>=2.0
+                  conan profile detect --force
+                  conan install . --build=missing
+
+                  # Build and test
+                  cmake --preset conan-default
+                  cmake --build --preset conan-release
+                  echo "✓ Example consumer built successfully"
+
+
+
+

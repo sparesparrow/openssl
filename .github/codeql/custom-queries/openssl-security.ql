@@ -26,3 +26,7 @@ where
   call.getAnArgument() = size and
   size.getType().(IntegerType).getSize() < 32
 select call, "Potential buffer overflow: OpenSSL EVP function with small size argument"
+
+
+
+

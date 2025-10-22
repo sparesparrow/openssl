@@ -1,0 +1,132 @@
+name: OpenSSL Conan Build & Publish
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "conanfile.py"
+      - "VERSION.dat"
+      - "**/conanfile.py"
+  pull_request:
+    branches: [main]
+    paths:
+      - "conanfile.py"
+      - "VERSION.dat"
+      - "**/conanfile.py"
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build for'
+        required: false
+        default: 'linux-gcc11'
+        type: choice
+        options:
+          - linux-gcc11
+          - linux-clang15
+          - windows-msvc2022
+          - macos-clang14
+      fips-enabled:
+        description: 'Enable FIPS mode'
+        required: false
+        default: false
+        type: boolean
+      publish:
+        description: 'Publish to registry'
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  id-token: write
+  contents: read
+  security-events: write
+
+jobs:
+  build-and-test:
+    name: Build OpenSSL with Conan
+    uses: sparesparrow/openssl-tools/.github/workflows/reusable/build-component.yml@reusable-workflows/v1.0.0
+    with:
+      component: 'openssl'
+      platform: ${{ inputs.platform || 'linux-gcc11' }}
+      fips-enabled: ${{ inputs.fips-enabled || false }}
+      upload-artifacts: true
+    secrets:
+      CONAN_LOGIN_USERNAME: ${{ secrets.CONAN_LOGIN_USERNAME }}
+      CONAN_PASSWORD: ${{ secrets.CONAN_PASSWORD }}
+
+  security-scan:
+    name: Security Scan
+    uses: sparesparrow/openssl-tools/.github/workflows/reusable/security-scan.yml@reusable-workflows/v1.0.0
+    with:
+      component: 'openssl'
+      scan-type: 'fips'
+      generate-sbom: true
+    secrets:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish:
+    name: Publish to Registry
+    if: inputs.publish != false && github.event_name == 'push'
+    uses: sparesparrow/openssl-tools/.github/workflows/reusable/upload-registry.yml@reusable-workflows/v1.0.0
+    with:
+      component: 'openssl'
+      platform: ${{ inputs.platform || 'linux-gcc11' }}
+      registry: 'cloudsmith'
+      version: ${{ github.ref_name }}
+    needs: [build-and-test, security-scan]
+
+  integration-test:
+    name: Integration Test
+    runs-on: ubuntu-latest
+    needs: [build-and-test]
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+          
+      - name: Install Conan
+        run: pip install conan==2.0.17
+        
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: openssl-${{ inputs.platform || 'linux-gcc11' }}-Release
+          path: ~/.conan2/p/
+          
+      - name: Test package consumption
+        run: |
+          # Create a test consumer
+          mkdir test-consumer
+          cd test-consumer
+          
+          cat > conanfile.txt << EOF
+          [requires]
+          openssl/${{ github.ref_name }}@sparesparrow/stable
+          
+          [generators]
+          CMakeDeps
+          CMakeToolchain
+          EOF
+          
+          # Install the package
+          conan install . --build=missing
+          
+          # Verify installation
+          conan list "*" --format=json | jq '.[] | select(.name == "openssl")'
+          
+      - name: Test FIPS functionality
+        if: inputs.fips-enabled == true
+        run: |
+          cd test-consumer
+          # Test FIPS-specific functionality
+          echo "Testing FIPS mode..."
+          # Add FIPS-specific tests here
