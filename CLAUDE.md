@@ -142,4 +142,44 @@ python ../scripts/validate-conan-packages.py openssl/4.0.2
 - CMake integration properties
 
 
+**Role:** 🟡 Domain Layer (Source code)
 
+Main OpenSSL cryptographic library with Conan 2.x packaging and FIPS support
+
+## Architecture Position
+
+**Layer:** Domain (Top of dependency hierarchy)
+**Dependencies:**
+- openssl-base/1.0.1 (python_requires)
+- openssl-tools/1.2.4 (python_requires)
+- openssl-fips-data/140-3.2 (python_requires)
+**Consumers:** Downstream applications (curl, etc.)
+
+## Key Files
+
+- `conanfile.py`: Main package (v4.0.3)
+- `crypto/`, `ssl/`: Core cryptographic implementations
+- `providers/fips/`: FIPS provider module
+- `test/`: Comprehensive test suite
+- `BUILDING-CONAN.md`: Conan integration documentation
+
+## Quick Start
+
+```bash
+# Clone repository (if not in workspace)
+git clone https://github.com/sparesparrow/openssl.git
+
+# Navigate to directory
+cd openssl
+
+# Create Conan package
+conan create . --build=missing
+```
+
+## Related Documentation
+
+- [Main Architecture Diagram](../architecture-diagram.md)
+- [Workspace Overview](../README.md)
+- [Conan Integration Guide](../docs/conan-extensions-diagram.md)
+
+---
