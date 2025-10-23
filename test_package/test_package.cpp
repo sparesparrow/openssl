@@ -1,72 +1,4 @@
-from conan import ConanFile
-from conan.tools.build import can_run
-from conan.tools.cmake import CMake, cmake_layout
-from conan.tools.files import save
-import os
 
-class TestPackageConan(ConanFile):
-    settings = "os", "compiler", "build_type", "arch"
-    generators = "CMakeDeps", "CMakeToolchain"
-    test_type = "explicit"
-    
-    def requirements(self):
-        self.requires(self.tested_reference_str)
-    
-    def layout(self):
-        cmake_layout(self)
-
-    def generate(self):
-        # Generate test source files
-        self._generate_test_sources()
-
-    def build(self):
-        cmake = CMake(self)
-        cmake.configure()
-        cmake.build()
-
-    def test(self):
-        if can_run(self):
-            # Test 1: Basic OpenSSL version check
-            self.run("openssl version", cwd=self.build_folder)
-
-            # Test 2: Run comprehensive test executable
-            test_exe = os.path.join(self.cpp.build.bindirs[0], "test_package")
-            if os.path.exists(test_exe):
-                self.run(test_exe, cwd=self.build_folder)
-            else:
-                self.output.warn("Test executable not found, skipping comprehensive tests")
-
-            # Test 3: Test that openssl_tools utilities are accessible
-            try:
-                self.run("python3 -c \"from openssl_tools import version_manager; print('Tools import works')\"", env="conanrun")
-            except Exception as e:
-                self.output.warn(f"openssl_tools import test skipped: {e}")
-
-    def _generate_test_sources(self):
-        """Generate comprehensive test source files"""
-
-        # Generate CMakeLists.txt
-        cmake_content = """
-cmake_minimum_required(VERSION 3.15)
-project(test_package)
-
-find_package(OpenSSL REQUIRED)
-
-# Test executable
-add_executable(test_package test_package.cpp)
-target_link_libraries(test_package OpenSSL::SSL OpenSSL::Crypto)
-
-# Test shared vs static linking
-if(OpenSSL_SHARED)
-    message(STATUS "Testing shared OpenSSL libraries")
-else()
-    message(STATUS "Testing static OpenSSL libraries")
-endif()
-"""
-        save(self, os.path.join(self.source_folder, "CMakeLists.txt"), cmake_content)
-
-        # Generate comprehensive test source
-        test_source = """
 #include <openssl/ssl.h>
 #include <openssl/crypto.h>
 #include <openssl/evp.h>
@@ -214,12 +146,10 @@ int main() {
         test_fips_mode();
         test_error_handling();
 
-        std::cout << "\\n✅ All tests passed successfully!" << std::endl;
+        std::cout << "\n✅ All tests passed successfully!" << std::endl;
         return 0;
     } catch (const std::exception& e) {
         std::cerr << "❌ Test failed: " << e.what() << std::endl;
         return 1;
     }
 }
-"""
-        save(self, os.path.join(self.source_folder, "test_package.cpp"), test_source)

@@ -440,3 +440,5 @@ build.ninja*
 *.ninja.new
 test-*.sh
 Configurations/*.ninja.tmpl
+.cursor/
+test_package/build/
