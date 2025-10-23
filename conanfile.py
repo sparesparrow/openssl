@@ -235,7 +235,7 @@ class OpenSSLConan(ConanFile):
         except ImportError:
             # Fallback to manual install if tools not available
             with chdir(self, self.source_folder):
-                self.run("make install")
+                self.run(f"make install DESTDIR={self.package_folder}")
 
         # Copy licenses
         copy(self, "LICENSE*", src=self.source_folder,
