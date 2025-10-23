@@ -1,6 +1,7 @@
 from conan import ConanFile
 from conan.tools.env import VirtualBuildEnv
-from conan.tools.files import copy, chdir
+from conan.tools.files import copy, chdir, get, replace_in_file
+from conan.tools.layout import basic_layout
 import os
 
 class OpenSSLConan(ConanFile):
@@ -16,11 +17,15 @@ class OpenSSLConan(ConanFile):
         "shared": [True, False],
         "fPIC": [True, False],
         "fips": [True, False],
+        "no_threads": [True, False],
+        "no_asm": [True, False],
     }
     default_options = {
         "shared": True,
         "fPIC": True,
         "fips": False,
+        "no_threads": False,
+        "no_asm": False,
     }
 
     requires = "zlib/1.3.1"
@@ -28,6 +33,9 @@ class OpenSSLConan(ConanFile):
         "openssl-profiles/2.0.1",
         "openssl-tools/1.2.6"
     ]
+
+    def layout(self):
+        basic_layout(self)
 
     def set_version(self):
         """Read version from VERSION.dat"""
@@ -49,25 +57,109 @@ class OpenSSLConan(ConanFile):
             self.version = "4.0.1-dev"
 
     def export_sources(self):
-        """Export OpenSSL source tree efficiently, excluding external Perl modules"""
-        import shutil
-
-        # Copy everything first
-        copy(self, "*", src=self.recipe_folder, dst=self.export_sources_folder)
-
-        # Then remove the problematic external directory
-        external_dir = os.path.join(self.export_sources_folder, "external")
-        if os.path.exists(external_dir):
-            shutil.rmtree(external_dir)
-            self.output.info("Excluded external Perl modules directory from export")
-
-        # Explicitly exclude external directory to avoid Perl module issues
-        # The external directory contains problematic Perl modules that cause Configure to fail
+        """Export source files"""
+        # Export essential source files for OpenSSL build
+        copy(self, "*.pm", src=".", dst=self.export_sources_folder)
+        copy(self, "*.conf", src=".", dst=self.export_sources_folder)
+        copy(self, "*.tmpl", src=".", dst=self.export_sources_folder)
+        copy(self, "*.info", src=".", dst=self.export_sources_folder)
+        copy(self, "*.num", src=".", dst=self.export_sources_folder)
+        copy(self, "config*", src=".", dst=self.export_sources_folder)
+        copy(self, "Configure*", src=".", dst=self.export_sources_folder)
+        copy(self, "Makefile*", src=".", dst=self.export_sources_folder)
+        copy(self, "VERSION*", src=".", dst=self.export_sources_folder)
+        copy(self, "LICENSE*", src=".", dst=self.export_sources_folder)
+        copy(self, "README*", src=".", dst=self.export_sources_folder)
+        copy(self, "include/**", src=".", dst=self.export_sources_folder)
+        copy(self, "crypto/**", src=".", dst=self.export_sources_folder)
+        copy(self, "ssl/**", src=".", dst=self.export_sources_folder)
+        copy(self, "apps/**", src=".", dst=self.export_sources_folder)
+        copy(self, "test/**", src=".", dst=self.export_sources_folder)
+        copy(self, "util/**", src=".", dst=self.export_sources_folder)
+        copy(self, "engines/**", src=".", dst=self.export_sources_folder)
+        copy(self, "providers/**", src=".", dst=self.export_sources_folder)
+        copy(self, "fuzz/**", src=".", dst=self.export_sources_folder)
+        copy(self, "doc/**", src=".", dst=self.export_sources_folder)
+        copy(self, "*.py", src=".", dst=self.export_sources_folder)
+        copy(self, "*.dat", src=".", dst=self.export_sources_folder)
+        copy(self, "*.txt", src=".", dst=self.export_sources_folder)
+        copy(self, "*.com", src=".", dst=self.export_sources_folder)
+        copy(self, "*.in", src=".", dst=self.export_sources_folder)
+        copy(self, "*.inc", src=".", dst=self.export_sources_folder)
+        copy(self, "*.checksum", src=".", dst=self.export_sources_folder)
+        copy(self, "*.c", src=".", dst=self.export_sources_folder)
+        copy(self, "*.checksums", src=".", dst=self.export_sources_folder)
+        copy(self, "*.sources", src=".", dst=self.export_sources_folder)
+        copy(self, "*.h", src=".", dst=self.export_sources_folder)
+        copy(self, "*.H", src=".", dst=self.export_sources_folder)
+        copy(self, "*.asn1", src=".", dst=self.export_sources_folder)
+        copy(self, "*.ec", src=".", dst=self.export_sources_folder)
+        copy(self, "*.pl", src=".", dst=self.export_sources_folder)
+        copy(self, "*.S", src=".", dst=self.export_sources_folder)
+        copy(self, "*.asm", src=".", dst=self.export_sources_folder)
+        copy(self, "*.m4", src=".", dst=self.export_sources_folder)
+        copy(self, "*.pem", src=".", dst=self.export_sources_folder)
+        copy(self, "*.der", src=".", dst=self.export_sources_folder)
+        copy(self, "*.bin", src=".", dst=self.export_sources_folder)
+        copy(self, "*.cnf", src=".", dst=self.export_sources_folder)
+        copy(self, "*.pfx", src=".", dst=self.export_sources_folder)
+        copy(self, "*.ors", src=".", dst=self.export_sources_folder)
+        copy(self, "*.sh", src=".", dst=self.export_sources_folder)
+        copy(self, "*.attr", src=".", dst=self.export_sources_folder)
+        copy(self, "*.sct", src=".", dst=self.export_sources_folder)
+        copy(self, "*.t", src=".", dst=self.export_sources_folder)
+        copy(self, "*.crt", src=".", dst=self.export_sources_folder)
+        copy(self, "*.key", src=".", dst=self.export_sources_folder)
+        copy(self, "*.p12", src=".", dst=self.export_sources_folder)
+        copy(self, "*.cms", src=".", dst=self.export_sources_folder)
+        copy(self, "*.0", src=".", dst=self.export_sources_folder)
+        copy(self, "*.ascii", src=".", dst=self.export_sources_folder)
+        copy(self, "*.utf8", src=".", dst=self.export_sources_folder)
+        copy(self, "*.pvk", src=".", dst=self.export_sources_folder)
+        copy(self, "*.msb", src=".", dst=self.export_sources_folder)
+        copy(self, "*.csr", src=".", dst=self.export_sources_folder)
+        copy(self, "*.expected", src=".", dst=self.export_sources_folder)
+        copy(self, "*.noncnf", src=".", dst=self.export_sources_folder)
+        copy(self, "*.expected2", src=".", dst=self.export_sources_folder)
+        copy(self, "*.expected1", src=".", dst=self.export_sources_folder)
+        copy(self, "*.bak", src=".", dst=self.export_sources_folder)
+        copy(self, "*.tsq", src=".", dst=self.export_sources_folder)
+        copy(self, "*.tsr", src=".", dst=self.export_sources_folder)
+        copy(self, "*.csv", src=".", dst=self.export_sources_folder)
+        copy(self, "*.pkcs7", src=".", dst=self.export_sources_folder)
+        copy(self, "*.out", src=".", dst=self.export_sources_folder)
+        copy(self, "*.text", src=".", dst=self.export_sources_folder)
+        copy(self, "*.tlssct", src=".", dst=self.export_sources_folder)
+        copy(self, "*.eml", src=".", dst=self.export_sources_folder)
+        copy(self, "*.Configure", src=".", dst=self.export_sources_folder)
+        copy(self, "*.srl", src=".", dst=self.export_sources_folder)
+        copy(self, "*.config", src=".", dst=self.export_sources_folder)
+        copy(self, "*.syms", src=".", dst=self.export_sources_folder)
+        copy(self, "*.rb", src=".", dst=self.export_sources_folder)
+        copy(self, "*.pro", src=".", dst=self.export_sources_folder)
+        copy(self, "*.sed", src=".", dst=self.export_sources_folder)
+        copy(self, "*.json", src=".", dst=self.export_sources_folder)
+        copy(self, "*.el", src=".", dst=self.export_sources_folder)
+        copy(self, "*.pod", src=".", dst=self.export_sources_folder)
+        copy(self, "*.png", src=".", dst=self.export_sources_folder)
+        copy(self, "*.dot", src=".", dst=self.export_sources_folder)
+        copy(self, "*.ods", src=".", dst=self.export_sources_folder)
+        copy(self, "*.svg", src=".", dst=self.export_sources_folder)
+        copy(self, "*.plantuml", src=".", dst=self.export_sources_folder)
+        copy(self, "*.odg", src=".", dst=self.export_sources_folder)
+        copy(self, "*.def", src=".", dst=self.export_sources_folder)
 
     def configure(self):
         """Configure package options"""
         if not self.options.shared:
             self.options.fPIC = True
+
+    def build_requirements(self):
+        """Add build requirements based on platform"""
+        if self.settings.os == "Windows":
+            self.tool_requires("strawberryperl/5.32.1.1")
+            self.tool_requires("nasm/2.15.05")
+        # On Unix systems, assume Perl and make are available as system packages
 
     def generate(self):
         """Setup build environment"""
@@ -75,38 +167,19 @@ class OpenSSLConan(ConanFile):
         env.generate()
 
     def build(self):
-        """Build OpenSSL using Configure + Make"""
+        """Build OpenSSL using build orchestrator"""
+        # Get the OpenSSL tools for build orchestration
+        try:
+            from openssl_tools.foundation import OpenSSLBuildOrchestrator
+            orchestrator = OpenSSLBuildOrchestrator(self)
+            orchestrator.configure_and_build()
+        except ImportError:
+            # Fallback to manual build if tools not available
+            self._manual_build()
+
+    def _manual_build(self):
+        """Manual build process as fallback"""
         with chdir(self, self.source_folder):
-            # Patch all Perl scripts to skip external Perl modules
-            import glob
-
-            # Find all Perl scripts that reference external/perl
-            perl_scripts = []
-            perl_scripts.append(os.path.join(self.source_folder, "Configure"))
-            perl_scripts.extend(glob.glob(os.path.join(self.source_folder, "util", "*.pl")))
-            perl_scripts.extend(glob.glob(os.path.join(self.source_folder, "util", "perl", "**", "*.pm"), recursive=True))
-
-            for script_path in perl_scripts:
-                if os.path.exists(script_path):
-                    with open(script_path, 'r') as f:
-                        script_content = f.read()
-
-                    # Comment out lines that try to load external Perl modules
-                    original_content = script_content
-                    script_content = script_content.replace(
-                        'use OpenSSL::fallback "$FindBin::Bin/external/perl/MODULES.txt";',
-                        '# use OpenSSL::fallback "$FindBin::Bin/external/perl/MODULES.txt";  # Disabled by Conan'
-                    )
-                    script_content = script_content.replace(
-                        'use OpenSSL::fallback "$FindBin::Bin/../external/perl/MODULES.txt";',
-                        '# use OpenSSL::fallback "$FindBin::Bin/../external/perl/MODULES.txt";  # Disabled by Conan'
-                    )
-
-                    if script_content != original_content:
-                        with open(script_path, 'w') as f:
-                            f.write(script_content)
-                        self.output.info(f"Patched {os.path.basename(script_path)} to skip external Perl modules")
-
             # Platform-specific Configure target
             target_map = {
                 ("Linux", "x86_64"): "linux-x86_64",
@@ -132,26 +205,37 @@ class OpenSSLConan(ConanFile):
             if not self.options.shared:
                 configure_args.append("no-shared")
 
+            if self.options.no_threads:
+                configure_args.append("no-threads")
+
+            if self.options.no_asm:
+                configure_args.append("no-asm")
+
             # Set environment variables for Configure
             env_vars = [
-                "PERL=/usr/bin/perl",  # Use system Perl
+                "PERL=perl",  # Use system Perl
                 f"OPENSSL_CONF_INCLUDE={os.path.join(self.source_folder, 'Configurations')}",
-                "PERL5LIB=",  # Clear Perl library path to avoid external modules
-                "PERLLIB=",   # Clear Perl library path to avoid external modules
-                "OPENSSL_NO_EXTERNAL_PERL=1"  # Disable external Perl modules
             ]
 
             # Run Configure (generates Makefile, NOT build.ninja)
-            self.run(" ".join(configure_args), env=env_vars)
+            self.run(configure_args, env=env_vars)
 
             # Build with make (official OpenSSL backend)
             # Use fewer parallel jobs to avoid dependency file conflicts
-            self.run(f"make -j{min(4, os.cpu_count() or 1)}", env=env_vars)
+            import multiprocessing
+            cpu_count = min(4, multiprocessing.cpu_count() or 1)
+            self.run(f"make -j{cpu_count}", env=env_vars)
 
     def package(self):
         """Install OpenSSL"""
-        with chdir(self, self.source_folder):
-            self.run("make install")
+        try:
+            from openssl_tools.foundation import OpenSSLBuildOrchestrator
+            orchestrator = OpenSSLBuildOrchestrator(self)
+            orchestrator.install_openssl()
+        except ImportError:
+            # Fallback to manual install if tools not available
+            with chdir(self, self.source_folder):
+                self.run("make install")
 
         # Copy licenses
         copy(self, "LICENSE*", src=self.source_folder,
@@ -182,6 +266,11 @@ class OpenSSLConan(ConanFile):
 
         # Root package (for legacy consumers)
         self.cpp_info.libs = ["ssl", "crypto"]
+
+        # Directories
+        self.cpp_info.bindirs = ["bin"]
+        self.cpp_info.libdirs = ["lib64", "lib"]
+        self.cpp_info.includedirs = ["include"]
 
         # System dependencies
         if self.settings.os == "Linux":
