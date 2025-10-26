@@ -1,0 +1,26 @@
+#!/bin/bash
+# OpenSSL Configure Script - Wrapper for Python configure.py
+#
+# This script replaces the Perl-based Configure script with a Python-based
+# implementation. It maintains backward compatibility while leveraging
+# Conan 2.x features and Python tooling.
+
+set -e
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Check if Python 3 is available
+if ! command -v python3 &> /dev/null; then
+    echo "Error: Python 3 is required but not found" >&2
+    exit 1
+fi
+
+# Check if configure.py exists
+if [[ ! -f "$SCRIPT_DIR/configure.py" ]]; then
+    echo "Error: configure.py not found in $SCRIPT_DIR" >&2
+    exit 1
+fi
+
+# Execute the Python configure script with all arguments
+exec python3 "$SCRIPT_DIR/configure.py" "$@"

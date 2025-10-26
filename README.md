@@ -1,287 +1,214 @@
-# OpenSSL Repository
+# OpenSSL Development Environment
 
-This repository contains the core OpenSSL library implementation.
+**Complete Testing Orchestration for DDD 4-Repository Layered Architecture**
 
-## Repository Cooperation
+This workspace provides a comprehensive development and testing environment for the OpenSSL ecosystem, containing 8 repositories organized across architectural layers.
 
-This repository works with [openssl-tools](https://github.com/sparesparrow/openssl-tools) for:
-- Advanced CI/CD orchestration
-- Conan package management
-- Build optimization and caching
-- Artifact distribution
+## 🚀 Quick Start
 
-## Development Workflow
+### Option 1: VSCode/Cursor Workspace
+```bash
+cd ~/projects/openssl-devenv
+code openssl-devenv.code-workspace
+```
 
-1. Make changes to OpenSSL source code
-2. Push changes (triggers core validation)
-3. Core validation triggers openssl-tools CI
-4. Packages built and distributed via openssl-tools
+### Option 2: DevContainer
+```bash
+# Open in VSCode/Cursor with devcontainer support
+# Automatically sets up full environment
+```
 
-## Minimal Dependencies
+### Option 3: Manual Setup
+```bash
+# Configure environment
+cp .env.example .env  # Edit with your CLOUDSMITH_API_KEY
 
-- `conanfile.py` - Basic package definition
-- `conan/default.profile` - Basic build profile
-- Core CI workflows for validation and triggering
+# Setup Conan user/channel (optional)
+./scripts/setup-conan-env.sh
 
----
+# Run setup
+./scripts/setup-dev-env.sh
 
-*This is a fork of the official [OpenSSL project](https://github.com/openssl/openssl) with minimal changes to support Conan packaging.*
+# Run tests
+./scripts/run-integration-tests.sh
+```
 
-Welcome to the OpenSSL Project
-==============================
+## 📦 Conan Package Management
 
-[![openssl logo]][www.openssl.org]
+This environment uses Conan for C/C++ package management with user/channel support for organizing package versions across different environments.
 
-OpenSSL is a robust, commercial-grade, full-featured Open Source Toolkit
-for the TLS (formerly SSL), DTLS and QUIC protocols.
+### Version Compatibility Matrix
 
-The protocol implementations are based on a full-strength general purpose
-cryptographic library, which can also be used stand-alone. Also included is a
-cryptographic module validated to conform with FIPS standards.
+| Repository | Version | Channel | Dependencies | Purpose |
+|------------|---------|---------|--------------|---------|
+| **openssl-conan-base** | 1.0.1 | stable | None | Foundation utilities, profiles, Python runtime |
+| **openssl-fips-policy** | 140-3.2 | stable | None | FIPS 140-3 certificates and compliance data |
+| **openssl-tools** | 2.2.2 | stable | openssl-base/1.0.1+ | Python-based build orchestration and tooling |
+| **openssl** | 3.6.0* | stable | openssl-tools/2.2.2+, openssl-fips-data/140-3.2+ | Core cryptographic library with Python configure |
+| **libcrypto** | 3.6.0* | stable | openssl-tools/2.2.2+ | Component: cryptographic primitives |
+| **libssl** | 3.6.0* | stable | libcrypto/3.6.0*, openssl-tools/2.2.2+ | Component: SSL/TLS protocols |
 
-OpenSSL is descended from the SSLeay library developed by Eric A. Young
-and Tim J. Hudson.
+*Version fallback: 4.0.0 → 3.6.0 → 3.4.1 (automatic fallback when unavailable)
 
-The official Home Page of the OpenSSL Project is [www.openssl.org].
+### Python-Based Build System Modernization
 
-Table of Contents
-=================
+This environment features a complete Python-based replacement for the traditional Perl build tooling:
 
- - [Overview](#overview)
- - [Download](#download)
- - [Build and Install](#build-and-install)
- - [Documentation](#documentation)
- - [License](#license)
- - [Support](#support)
- - [Contributing](#contributing)
- - [Legalities](#legalities)
+#### Modernized Components
+- **`configure.py`**: Python replacement for `Configure` script
+- **`mkerr.py`**: Error code generation (replaces `util/perl/mkerr.pl`)
+- **`mkbuildinf.py`**: Build information generator (replaces `util/perl/mkbuildinf.pl`)
+- **`paramnames.py`**: Parameter name mappings (replaces `util/perl/paramnames.pm`)
+- **`mkinstallvars.py`**: Installation variable generator (replaces `util/perl/mkinstallvars.pl`)
 
-Overview
-========
+#### Component Architecture
+The OpenSSL package is now available as independent components:
+- **`openssl`**: Full library with all components
+- **`libcrypto`**: Cryptographic primitives only
+- **`libssl`**: SSL/TLS protocols only
 
-The OpenSSL toolkit includes:
+#### Version-Aware Build Matrix
+Intelligent build matrix generation with automatic fallback:
+```bash
+# Generate build matrix with version fallback
+python openssl-tools/src/version_aware_matrix.py --target-version 4.0.0 --mode full
 
-- **libssl**
-  an implementation of all TLS protocol versions up to TLSv1.3 ([RFC 8446]),
-  DTLS protocol versions up to DTLSv1.2 ([RFC 6347]) and
-  the QUIC version 1 protocol ([RFC 9000]).
+# Minimal validation builds
+python openssl-tools/src/version_aware_matrix.py --target-version 4.0.0 --mode minimal
+```
 
-- **libcrypto**
-  a full-strength general purpose cryptographic library. It constitutes the
-  basis of the TLS implementation, but can also be used independently.
+### Dynamic Version Management
 
-- **openssl**
-  the OpenSSL command line tool, a swiss army knife for cryptographic tasks,
-  testing and analyzing. It can be used for
-  - creation of key parameters
-  - creation of X.509 certificates, CSRs and CRLs
-  - calculation of message digests
-  - encryption and decryption
-  - SSL/TLS/DTLS and client and server tests
-  - QUIC client tests
-  - handling of S/MIME signed or encrypted mail
-  - and more...
+The OpenSSL repository uses dynamic version reading from `VERSION.dat`:
 
-Download
-========
+```python
+def set_version(self):
+    """Read version from VERSION.dat file"""
+    version_file = os.path.join(self.recipe_folder, "VERSION.dat")
+    if os.path.exists(version_file):
+        # Parse MAJOR, MINOR, PATCH, PRE_RELEASE_TAG
+        # Build semantic version: 4.0.0-dev
+        self.version = parsed_version
+```
 
-For Production Use
-------------------
+### User/Channel Configuration
 
-Source code tarballs of the official releases can be downloaded from
-[openssl-library.org/source/](https://openssl-library.org/source/).
-The OpenSSL project does not distribute the toolkit in binary form.
+```bash
+# Setup environment variables
+export CONAN_USER=sparesparrow
+export CONAN_CHANNEL=stable  # or dev, testing, etc.
 
-However, for a large variety of operating systems precompiled versions
-of the OpenSSL toolkit are available. In particular, on Linux and other
-Unix operating systems, it is normally recommended to link against the
-precompiled shared libraries provided by the distributor or vendor.
+# Or use the setup script
+./scripts/setup-conan-env.sh
+```
 
-We also maintain a list of third parties that produce OpenSSL binaries for
-various Operating Systems (including Windows) on the [Binaries] page on our
-wiki.
+### Package References
 
-For Testing and Development
----------------------------
+Packages are referenced with user/channel format:
+```
+openssl/3.4.1@sparesparrow/stable
+openssl-build-tools/1.2.0@sparesparrow/dev
+openssl-base/1.0.0@sparesparrow/stable
+```
 
-Although testing and development could in theory also be done using
-the source tarballs, having a local copy of the git repository with
-the entire project history gives you much more insight into the
-code base.
+### Available Channels
 
-The main OpenSSL Git repository is private.
-There is a public GitHub mirror of it at [github.com/openssl/openssl],
-which is updated automatically from the former on every commit.
+- **`stable`**: Production-ready releases
+- **`dev`**: Development builds with latest features
+- **`testing`**: Pre-release testing builds
 
-A local copy of the Git repository can be obtained by cloning it from
-the GitHub mirror using
+### Consumer Usage
 
-    git clone https://github.com/openssl/openssl.git
+```bash
+# Install stable packages
+conan install openssl/3.4.1@sparesparrow/stable
 
-If you intend to contribute to OpenSSL, either to fix bugs or contribute
-new features, you need to fork the GitHub mirror and clone your public fork
-instead.
+# Or use environment variables
+conan install openssl/3.4.1@${CONAN_USER}/${CONAN_CHANNEL}
+```
 
-    git clone https://github.com/yourname/openssl.git
+## 🏗️ Architecture Layers
 
-This is necessary because all development of OpenSSL nowadays is done via
-GitHub pull requests. For more details, see [Contributing](#contributing).
+### 🔐 Foundation Layer
+- **openssl-conan-base**: Utilities, SBOM generation, profiles
+- **openssl-fips-policy**: FIPS certificates and compliance data
 
-Build and Install
-=================
+### 🛠️ Tooling Layer
+- **openssl-tools**: Build orchestration consuming foundation
 
-After obtaining the Source, have a look at the [INSTALL](INSTALL.md) file for
-detailed instructions about building and installing OpenSSL. For some
-platforms, the installation instructions are amended by a platform specific
-document.
+### 🔬 Testing & Integration
+- **fuzz-corpora**: Test data for fuzzing
+- **libcurl**: HTTP integration testing
+- **openssl-docs**: Documentation
 
- * [Notes for UNIX-like platforms](NOTES-UNIX.md)
- * [Notes for Android platforms](NOTES-ANDROID.md)
- * [Notes for Windows platforms](NOTES-WINDOWS.md)
- * [Notes for the DOS platform with DJGPP](NOTES-DJGPP.md)
- * [Notes for the OpenVMS platform](NOTES-VMS.md)
- * [Notes on Perl](NOTES-PERL.md)
- * [Notes on Valgrind](NOTES-VALGRIND.md)
+### 🌐 Domain Layer
+- **openssl**: Core cryptographic library
 
-Specific notes on upgrading to OpenSSL 3.x from previous versions can be found
-in the [ossl-guide-migration(7ossl)] manual page.
+### 🤖 Orchestration Layer
+- **mcp-project-orchestrator**: AI templates and Cursor integration
 
-Documentation
-=============
+## 🧪 Testing Scenarios
 
-README Files
-------------
+Run comprehensive integration tests:
+```bash
+./scripts/run-integration-tests.sh
+```
 
-There are some README.md files in the top level of the source distribution
-containing additional information on specific topics.
+### Individual Test Categories
 
- * [Information about the OpenSSL QUIC protocol implementation](README-QUIC.md)
- * [Information about the OpenSSL Provider architecture](README-PROVIDERS.md)
- * [Information about using the OpenSSL FIPS validated module](README-FIPS.md)
- * [Information about the legacy OpenSSL Engine architecture](README-ENGINES.md)
+**Dependency Management**:
+```bash
+cd openssl-tools && conan create . --build=missing
+```
 
-The OpenSSL Guide
------------------
+**Python Automation**:
+```bash
+cd openssl-conan-base && pytest tests/
+```
 
-There are some tutorial and introductory pages on some important OpenSSL topics
-within the [OpenSSL Guide].
+**Cloudsmith Integration**:
+```bash
+conan search "*" -r=${CONAN_REPOSITORY_NAME}
+```
 
-Manual Pages
-------------
+**Developer Workflow**:
+```bash
+cd mcp-project-orchestrator
+source venv/bin/activate
+mcp-orchestrator create-openssl-project --project-name test-app
+```
 
-The manual pages for the master branch and all current stable releases are
-available online.
+## 📊 Expected Behaviors
 
-- [OpenSSL master](https://docs.openssl.org/master/)
-- [OpenSSL 3.5](https://docs.openssl.org/3.5/)
-- [OpenSSL 3.4](https://docs.openssl.org/3.4/)
-- [OpenSSL 3.3](https://docs.openssl.org/3.3/)
-- [OpenSSL 3.2](https://docs.openssl.org/3.2/)
-- [OpenSSL 3.0](https://docs.openssl.org/3.0/)
+### Foundation Layer
+- **openssl-conan-base**: Self-contained utilities with comprehensive tests
+- **openssl-fips-policy**: Static certificate data, integrity verified
 
-Demos
------
+### Tooling Layer
+- **openssl-tools**: Fast builds, consumes foundation from Cloudsmith
 
-There are numerous source code demos for using various OpenSSL capabilities in the
-[demos subfolder](./demos).
+### Domain Layer
+- **openssl**: 5-phase aerospace build process, multi-target support
 
-Wiki
-----
+### Orchestration Layer
+- **mcp-project-orchestrator**: AI-enhanced project creation and IDE integration
 
-There is a [GitHub Wiki] which is currently not very active.
+## 🔧 Configuration
 
-License
-=======
+Edit `.env` file:
+```bash
+CLOUDSMITH_API_KEY=your-api-key-here
+# ... other configuration
+```
 
-OpenSSL is licensed under the Apache License 2.0, which means that
-you are free to get and use it for commercial and non-commercial
-purposes as long as you fulfill its conditions.
+## 🎯 Success Criteria
 
-See the [LICENSE.txt](LICENSE.txt) file for more details.
+- ✅ All 8 repositories functional
+- ✅ Cross-layer dependencies resolve
+- ✅ CI/CD publishes to Cloudsmith
+- ✅ AI integration working
+- ✅ Performance benchmarks met
 
-Support
-=======
+## 📚 Documentation
 
-There are various ways to get in touch. The correct channel depends on
-your requirement. See the [SUPPORT](SUPPORT.md) file for more details.
-
-Contributing
-============
-
-If you are interested and willing to contribute to the OpenSSL project,
-please take a look at the [CONTRIBUTING](CONTRIBUTING.md) file.
-
-Legalities
-==========
-
-A number of nations restrict the use or export of cryptography. If you are
-potentially subject to such restrictions, you should seek legal advice before
-attempting to develop or distribute cryptographic code.
-
-Copyright
-=========
-
-Copyright (c) 1998-2025 The OpenSSL Project Authors
-
-Copyright (c) 1995-1998 Eric A. Young, Tim J. Hudson
-
-All rights reserved.
-
-<!-- Links  -->
-
-[www.openssl.org]:
-    <https://www.openssl.org>
-    "OpenSSL Homepage"
-
-[github.com/openssl/openssl]:
-    <https://github.com/openssl/openssl>
-    "OpenSSL GitHub Mirror"
-
-[GitHub Wiki]:
-    <https://github.com/openssl/openssl/wiki>
-    "OpenSSL Wiki"
-
-[ossl-guide-migration(7ossl)]:
-    <https://docs.openssl.org/master/man7/ossl-guide-migration>
-    "OpenSSL Migration Guide"
-
-[RFC 8446]:
-     <https://tools.ietf.org/html/rfc8446>
-
-[RFC 6347]:
-     <https://tools.ietf.org/html/rfc6347>
-
-[RFC 9000]:
-     <https://tools.ietf.org/html/rfc9000>
-
-[Binaries]:
-    <https://github.com/openssl/openssl/wiki/Binaries>
-    "List of third party OpenSSL binaries"
-
-[OpenSSL Guide]:
-    <https://docs.openssl.org/master/man7/ossl-guide-introduction>
-    "An introduction to OpenSSL"
-
-<!-- Logos and Badges -->
-
-[openssl logo]:
-    doc/images/openssl.svg
-    "OpenSSL Logo"
-
-[github actions ci badge]:
-    <https://github.com/openssl/openssl/workflows/GitHub%20CI/badge.svg>
-    "GitHub Actions CI Status"
-
-[github actions ci]:
-    <https://github.com/openssl/openssl/actions/workflows/ci.yml>
-    "GitHub Actions CI"
-
-[appveyor badge]:
-    <https://ci.appveyor.com/api/projects/status/8e10o7xfrg73v98f/branch/master?svg=true>
-    "AppVeyor Build Status"
-
-[appveyor jobs]:
-    <https://ci.appveyor.com/project/openssl/openssl/branch/master>
-    "AppVeyor Jobs"
-# Test trigger - Fri Oct 10 02:51:19 AM CEST 2025
-# Test dispatch token
+See `CLAUDE.md` for comprehensive testing guidelines and component behaviors.

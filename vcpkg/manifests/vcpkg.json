@@ -1,0 +1,25 @@
+{
+  "name": "openssl-tools-deps",
+  "version": "1.0.0",
+  "description": "OpenSSL build dependencies via vcpkg",
+  "dependencies": [
+    {
+      "name": "openssl",
+      "features": ["tools"]
+    },
+    {
+      "name": "zlib"
+    }
+  ],
+  "features": {
+    "fips": {
+      "description": "Enable FIPS 140-3 compliance features",
+      "dependencies": [
+        {
+          "name": "openssl",
+          "features": ["fips"]
+        }
+      ]
+    }
+  }
+}

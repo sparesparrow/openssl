@@ -1,0 +1,366 @@
+---
+title: OpenSSL Development Environment Rules
+platform: all
+project_type: openssl-dev-env
+---
+
+# OpenSSL Multi-Repository Development Environment
+
+## Environment Overview
+
+This workspace contains 8 repositories forming a complete OpenSSL ecosystem:
+
+### 🔐 Foundation Layer
+- **openssl-conan-base**: Foundation utilities, SBOM generation, profile deployment
+- **openssl-fips-policy**: FIPS 140-3 certificates and compliance data
+
+### 🛠️ Tooling Layer  
+- **openssl-tools**: Build orchestration consuming foundation packages
+#### Mod
+- version_manager.py → openssl_tools/foundation/ - Semantic versioning with FIPS metadata
+sbom_generator.py → openssl_tools/security/ - CycloneDX SBOM generation with FIPS compliance
+profile_deployer.py → openssl_tools/foundation/ - Conan profile management
+artifactory_handler.py → openssl_tools/core/ - Artifactory/Cloudsmith integration
+quality_manager.py → openssl_tools/testing/ - Enterprise-grade code quality management
+fuzz_manager.py → openssl_tools/testing/ - Fuzz corpora package management
+conan_orchestrator.py → openssl_tools/automation/ - Advanced CI/CD automation
+bn_rand_range.py → openssl_tools/statistics/ - Statistical test data generation
+
+### 🔬 Testing & Integration
+- **fuzz-corpora**: Fuzz testing corpora and test data
+- **libcurl**: HTTP library integration testing
+- **openssl-docs**: Documentation and guides
+
+### 🌐 Domain Layer
+- **openssl**: Core OpenSSL cryptographic library with Conan packaging
+
+### 🤖 Orchestration Layer
+- **mcp-project-orchestrator**: AI-enhanced project templates and Cursor integration
+
+## Repository Roles & Responsibilities
+
+### openssl-conan-base
+**Purpose**: Foundation utilities for OpenSSL Conan ecosystem
+**Key Files**: 
+- `openssl_base/version_manager.py`: Hybrid semantic+FIPS versioning
+- `openssl_base/sbom_generator.py`: CycloneDX SBOM generation
+- `openssl_base/profile_deployer.py`: Conan profile management
+**Testing**: Unit tests in `tests/` directory
+**CI/CD**: Publishes to Cloudsmith on main branch pushes
+
+### openssl-fips-policy  
+**Purpose**: FIPS 140-3 compliance artifacts
+**Key Files**:
+- `fips-140-3/certificates/certificate-4985.json`: FIPS certificate data
+- `fips-140-3/schemas/`: JSON schema validation (planned)
+**Testing**: Certificate validation and integrity checks
+**CI/CD**: Publishes FIPS data package to Cloudsmith
+
+### openssl-tools
+**Purpose**: Build orchestration layer
+**Dependencies**: Requires `openssl-base/1.0.0` and `openssl-fips-data/140-3.1`
+**Key Files**:
+- `conanfile.py`: Tooling package definition
+- `scripts/`: Build and deployment scripts
+**CI/CD**: Consumes foundation packages, publishes tooling package
+
+### openssl
+**Purpose**: OpenSSL cryptographic library with layered architecture support
+**Key Features**:
+- 5-phase build process (aerospace pattern)
+- Deployment targets: general, fips-government, embedded
+- FIPS module integration with certificate #4985
+- SBOM generation and compliance metadata
+**Dependencies**: Requires `openssl-build-tools/1.2.0`
+**Testing**: Comprehensive crypto and TLS validation
+
+### mcp-project-orchestrator
+**Purpose**: AI-enhanced project creation and Cursor integration
+**Key Features**:
+- OpenSSL consumer project templates with Jinja2 rendering
+- Cursor configuration deployment
+- MCP server for orchestration
+**Testing**: Template rendering and project creation
+
+## Development Workflows
+
+### 1. Dependency Management Testing
+**Goal**: Verify package dependencies resolve correctly
+**Procedure**:
+```bash
+cd openssl-tools
+conan create . --build=missing
+# Should pull openssl-base and openssl-fips-data from Cloudsmith
+```
+
+**Expected Behavior**:
+- Conan resolves all transitive dependencies
+- Foundation packages download from Cloudsmith
+- No local builds required for foundation packages
+
+### 2. Python Automation Testing
+**Goal**: Test Python utilities and orchestration scripts
+**Procedure**:
+```bash
+cd openssl-conan-base
+python -c "from openssl_base import get_openssl_version, generate_openssl_sbom; print('Version:', get_openssl_version('3.4.1', True))"
+pytest tests/
+```
+
+**Expected Behavior**:
+- Utilities import and execute correctly
+- Version manager handles FIPS timestamps
+- SBOM generator creates valid CycloneDX format
+- All tests pass
+
+### 3. Cloudsmith Integration Testing
+**Goal**: Verify package publishing and consumption
+**Procedure**:
+```bash
+# Check published packages
+conan search "*" -r=${CONAN_REPOSITORY_NAME}
+
+# Test package consumption
+conan install --requires=openssl/3.4.1 -r=${CONAN_REPOSITORY_NAME}
+```
+
+**Expected Behavior**:
+- All 4 packages visible in remote
+- Package installation succeeds
+- No authentication errors
+
+### 4. Conan & Python Environment Testing
+**Goal**: Test virtual environment and dependency isolation
+**Procedure**:
+```bash
+cd mcp-project-orchestrator
+python -m venv venv
+source venv/bin/activate
+pip install -e .
+mcp-orchestrator create-openssl-project --project-name test-app
+```
+
+**Expected Behavior**:
+- Virtual environment isolates dependencies
+- MCP orchestrator installs correctly
+- Project creation generates proper files
+
+### 5. Conan Remote Artifact Caching
+**Goal**: Test caching behavior across builds
+**Procedure**:
+```bash
+# First build (downloads from remote)
+time conan create openssl-conan-base --build=missing
+
+# Second build (uses cache)
+time conan create openssl-conan-base --build=missing
+```
+
+**Expected Behavior**:
+- First build downloads dependencies
+- Second build uses cached artifacts
+- Significant time reduction in subsequent builds
+
+### 6. Developer Workflow Simulation
+**Goal**: Test complete development workflow
+**Procedure**:
+```bash
+# 1. Create project
+cd mcp-project-orchestrator
+source venv/bin/activate
+mcp-orchestrator create-openssl-project --project-name my-app --deployment-target fips-government
+
+# 2. Build project
+cd ../my-app
+conan install . --build=missing
+cmake --preset conan-default
+cmake --build --preset conan-release
+
+# 3. Run application
+./build/Release/my-app
+```
+
+**Expected Behavior**:
+- Project creation succeeds with FIPS options
+- Dependencies resolve correctly
+- Build completes without errors
+- Application runs and shows FIPS mode enabled
+
+### 7. Domain Repo Source Code Compile Performance
+**Goal**: Measure compilation performance
+**Procedure**:
+```bash
+cd openssl
+time conan create . --build=missing -o deployment_target=general
+time conan create . --build=missing -o deployment_target=fips-government
+```
+
+**Expected Behavior**:
+- General build completes in reasonable time
+- FIPS build includes additional validation
+- Performance metrics collected for optimization
+
+### 8. Integration Testing
+**Goal**: Test component interactions
+**Procedure**:
+```bash
+# Test cross-repository dependencies
+cd openssl-tools
+conan create . --build=missing
+
+cd ../openssl  
+conan create . --build=missing
+
+# Test template system
+cd ../mcp-project-orchestrator
+source venv/bin/activate
+mcp-orchestrator create-openssl-project --project-name integration-test
+```
+
+**Expected Behavior**:
+- All repositories build successfully
+- Dependencies resolve across repositories
+- Template system generates functional projects
+
+### 9. AI Integration Testing
+**Goal**: Test Cursor and MCP functionality
+**Procedure**:
+```bash
+# Deploy Cursor configuration
+cd mcp-project-orchestrator
+source venv/bin/activate
+mcp-orchestrator deploy-cursor --project-type openssl
+
+# Start MCP server
+python -m mcp_project_orchestrator.server
+```
+
+**Expected Behavior**:
+- Cursor configuration deploys to .cursor/ directories
+- MCP server starts successfully
+- AI assistance recognizes OpenSSL patterns
+
+### 10. Workflow Triggers & GitHub Actions
+**Goal**: Test CI/CD pipeline triggers
+**Procedure**:
+```bash
+# Push changes to trigger CI
+cd openssl-conan-base
+echo "# Test commit" >> README.md
+git add README.md
+git commit -m "test: trigger CI pipeline"
+git push origin main
+```
+
+**Expected Behavior**:
+- GitHub Actions workflows trigger
+- Build and publish steps execute
+- Packages appear in Cloudsmith after completion
+
+## Layered Architecture Component Behavior
+
+### Foundation Layer Components
+**openssl-conan-base**:
+- Provides version management with FIPS timestamp support
+- Generates SBOMs with compliance metadata
+- Deploys Conan profiles to user cache
+- Self-contained with no external dependencies
+
+**openssl-fips-policy**:
+- Exports FIPS certificate data and validation rules
+- Provides compliance metadata for government deployments
+- Serves as trusted source for FIPS artifacts
+
+### Tooling Layer Components  
+**openssl-tools**:
+- Consumes foundation packages from Cloudsmith
+- Provides build orchestration utilities
+- Acts as bridge between foundation and domain layers
+- Exposes environment variables for downstream consumers
+
+### Domain Layer Components
+**openssl**:
+- Implements 5-phase aerospace-quality build process
+- Supports multiple deployment targets (general, fips-government, embedded)
+- Generates SBOMs and compliance metadata
+- Consumes tooling layer for foundation utilities
+
+### Orchestration Layer Components
+**mcp-project-orchestrator**:
+- Provides AI-enhanced project creation templates
+- Deploys Cursor IDE configurations
+- Orchestrates multi-repository development workflows
+- Enables rapid prototyping and testing
+
+## Troubleshooting Guide
+
+### Conan Remote Issues
+```bash
+# Check remote configuration
+conan remote list
+
+# Verify authentication
+conan remote login ${CONAN_REPOSITORY_NAME} spare-sparrow --password "$CLOUDSMITH_API_KEY"
+
+# Clear cache if needed
+conan cache clean
+```
+
+### Build Failures
+```bash
+# Check dependencies
+conan info openssl-conan-base
+
+# Verify local environment
+python --version
+conan --version
+
+# Clean and retry
+conan cache clean
+conan create . --build=missing
+```
+
+### Template Issues
+```bash
+# Test template discovery
+cd mcp-project-orchestrator
+source venv/bin/activate
+python -c "from mcp_project_orchestrator.templates import TemplateManager; tm = TemplateManager('templates'); tm.discover_templates(); print('Templates:', tm.list_templates())"
+```
+
+### FIPS Testing
+```bash
+# Verify FIPS certificate data
+cd openssl-fips-policy
+python -c "import json; cert = json.load(open('fips-140-3/certificates/certificate-4985.json')); print('Certificate valid until:', cert['expiry_date'])"
+```
+
+## Performance Benchmarks
+
+### Expected Build Times
+- **openssl-conan-base**: < 30 seconds (Python utilities only)
+- **openssl-fips-policy**: < 10 seconds (data package only)  
+- **openssl-tools**: < 60 seconds (consumes foundation packages)
+- **openssl**: 5-15 minutes (full cryptographic library build)
+
+### Cache Effectiveness
+- First build: Downloads all dependencies
+- Subsequent builds: < 20% of original time
+- Clean cache impact: 3-5x slower builds
+
+## Security Considerations
+
+### FIPS Compliance
+- Only use validated algorithms and configurations
+- Verify FIPS mode is enabled in government deployments
+- Include certificate metadata in all builds
+
+### Dependency Security
+- All packages scanned for vulnerabilities
+- SBOM generation enables supply chain verification
+- Signed releases with reproducible builds
+
+### Development Security
+- Secrets managed via GitHub repository secrets
+- No hardcoded credentials in source code
+- Virtual environments isolate development dependencies
