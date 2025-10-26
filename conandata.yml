@@ -1,0 +1,10 @@
+sources:
+  "4.0.0-dev":
+    url: "https://github.com/openssl/openssl.git"
+    ref: "openssl-4.0.0-dev"
+  "3.4.1":
+    url: "https://github.com/openssl/openssl/archive/refs/tags/openssl-3.4.1.tar.gz"
+    sha256: "placeholder_sha256_for_3_4_1"
+  "3.6.0":
+    url: "https://github.com/openssl/openssl/archive/refs/tags/openssl-3.6.0.tar.gz"
+    sha256: "placeholder_sha256_for_3_6_0"
