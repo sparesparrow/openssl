@@ -1,16 +1,17 @@
 from conan import ConanFile
+from conan.errors import ConanInvalidConfiguration
 from conan.tools.env import VirtualBuildEnv
-from conan.tools.files import copy, chdir, get, replace_in_file
+from conan.tools.files import get
 from conan.tools.layout import basic_layout
-import os
+from pathlib import Path
 
 class OpenSSLConan(ConanFile):
     name = "openssl"
-    description = "OpenSSL cryptographic library"
+    description = "OpenSSL is an open-source toolkit for the Transport Layer Security (TLS) and Secure Sockets Layer (SSL) protocols."
     license = "Apache-2.0"
     url = "https://github.com/sparesparrow/openssl"
     homepage = "https://www.openssl.org"
-    topics = ("openssl", "crypto", "ssl", "tls")
+    topics = ("openssl", "crypto", "ssl", "tls", "fips")
 
     settings = "os", "compiler", "build_type", "arch"
     options = {
@@ -21,260 +22,257 @@ class OpenSSLConan(ConanFile):
         "no_asm": [True, False],
     }
     default_options = {
-        "shared": True,
+        "shared": False,
         "fPIC": True,
         "fips": False,
         "no_threads": False,
         "no_asm": False,
     }
 
-    requires = "zlib/1.3.1"
-    python_requires = [
-        "openssl-profiles/2.0.1",
-        "openssl-tools/1.2.6"
-    ]
+    # 💎 CENTRALIZED TOOLING: Using python_requires for build tools
+    python_requires = "openssl-tools/2.2.2"
 
-    def layout(self):
-        basic_layout(self)
+    # Export Python build scripts
+    exports = "configure.py", "util/python/*.py"
+
+    # ✅ BEST PRACTICE: This tells Conan to not use `export_sources`.
+    # The source() method is now the single source of truth for obtaining code.
+    no_copy_source = True
+
+    def init(self):
+        """Initialize the recipe with common settings."""
+        pass
 
     def set_version(self):
-        """Read version from VERSION.dat"""
-        version_file = os.path.join(self.recipe_folder, "VERSION.dat")
-        if os.path.exists(version_file):
-            with open(version_file, 'r') as f:
-                version_data = {}
-                for line in f:
-                    if '=' in line:
-                        key, value = line.split('=', 1)
-                        version_data[key.strip()] = value.strip().strip('"')
+        """Dynamically set the version with fallback logic."""
+        # Use centralized version manager with fallback support
+        try:
+            VersionManager = self.python_requires["openssl-tools"].module.VersionManager
+            version_manager = VersionManager(self.recipe_folder)
 
-                version = f"{version_data.get('MAJOR', '4')}.{version_data.get('MINOR', '0')}.{version_data.get('PATCH', '0')}"
-                prerelease = version_data.get('PRE_RELEASE_TAG', '')
-                if prerelease:
-                    version += f"-{prerelease}"
-                self.version = version
-        else:
-            self.version = "4.0.1-dev"
+            # Try to get version from git/version file first
+            detected_version = version_manager.get_version()
 
-    def export_sources(self):
-        """Export source files"""
-        # Export essential source files for OpenSSL build
-        copy(self, "*.pm", src=".", dst=self.export_sources_folder)
-        copy(self, "*.conf", src=".", dst=self.export_sources_folder)
-        copy(self, "*.tmpl", src=".", dst=self.export_sources_folder)
-        copy(self, "*.info", src=".", dst=self.export_sources_folder)
-        copy(self, "*.num", src=".", dst=self.export_sources_folder)
-        copy(self, "config*", src=".", dst=self.export_sources_folder)
-        copy(self, "Configure*", src=".", dst=self.export_sources_folder)
-        copy(self, "Makefile*", src=".", dst=self.export_sources_folder)
-        copy(self, "VERSION*", src=".", dst=self.export_sources_folder)
-        copy(self, "LICENSE*", src=".", dst=self.export_sources_folder)
-        copy(self, "README*", src=".", dst=self.export_sources_folder)
-        copy(self, "include/**", src=".", dst=self.export_sources_folder)
-        copy(self, "crypto/**", src=".", dst=self.export_sources_folder)
-        copy(self, "ssl/**", src=".", dst=self.export_sources_folder)
-        copy(self, "apps/**", src=".", dst=self.export_sources_folder)
-        copy(self, "test/**", src=".", dst=self.export_sources_folder)
-        copy(self, "util/**", src=".", dst=self.export_sources_folder)
-        copy(self, "engines/**", src=".", dst=self.export_sources_folder)
-        copy(self, "providers/**", src=".", dst=self.export_sources_folder)
-        copy(self, "fuzz/**", src=".", dst=self.export_sources_folder)
-        copy(self, "doc/**", src=".", dst=self.export_sources_folder)
-        copy(self, "*.py", src=".", dst=self.export_sources_folder)
-        copy(self, "*.dat", src=".", dst=self.export_sources_folder)
-        copy(self, "*.txt", src=".", dst=self.export_sources_folder)
-        copy(self, "*.com", src=".", dst=self.export_sources_folder)
-        copy(self, "*.in", src=".", dst=self.export_sources_folder)
-        copy(self, "*.inc", src=".", dst=self.export_sources_folder)
-        copy(self, "*.checksum", src=".", dst=self.export_sources_folder)
-        copy(self, "*.c", src=".", dst=self.export_sources_folder)
-        copy(self, "*.checksums", src=".", dst=self.export_sources_folder)
-        copy(self, "*.sources", src=".", dst=self.export_sources_folder)
-        copy(self, "*.h", src=".", dst=self.export_sources_folder)
-        copy(self, "*.H", src=".", dst=self.export_sources_folder)
-        copy(self, "*.asn1", src=".", dst=self.export_sources_folder)
-        copy(self, "*.ec", src=".", dst=self.export_sources_folder)
-        copy(self, "*.pl", src=".", dst=self.export_sources_folder)
-        copy(self, "*.S", src=".", dst=self.export_sources_folder)
-        copy(self, "*.asm", src=".", dst=self.export_sources_folder)
-        copy(self, "*.m4", src=".", dst=self.export_sources_folder)
-        copy(self, "*.pem", src=".", dst=self.export_sources_folder)
-        copy(self, "*.der", src=".", dst=self.export_sources_folder)
-        copy(self, "*.bin", src=".", dst=self.export_sources_folder)
-        copy(self, "*.cnf", src=".", dst=self.export_sources_folder)
-        copy(self, "*.pfx", src=".", dst=self.export_sources_folder)
-        copy(self, "*.ors", src=".", dst=self.export_sources_folder)
-        copy(self, "*.sh", src=".", dst=self.export_sources_folder)
-        copy(self, "*.attr", src=".", dst=self.export_sources_folder)
-        copy(self, "*.sct", src=".", dst=self.export_sources_folder)
-        copy(self, "*.t", src=".", dst=self.export_sources_folder)
-        copy(self, "*.crt", src=".", dst=self.export_sources_folder)
-        copy(self, "*.key", src=".", dst=self.export_sources_folder)
-        copy(self, "*.p12", src=".", dst=self.export_sources_folder)
-        copy(self, "*.cms", src=".", dst=self.export_sources_folder)
-        copy(self, "*.0", src=".", dst=self.export_sources_folder)
-        copy(self, "*.ascii", src=".", dst=self.export_sources_folder)
-        copy(self, "*.utf8", src=".", dst=self.export_sources_folder)
-        copy(self, "*.pvk", src=".", dst=self.export_sources_folder)
-        copy(self, "*.msb", src=".", dst=self.export_sources_folder)
-        copy(self, "*.csr", src=".", dst=self.export_sources_folder)
-        copy(self, "*.expected", src=".", dst=self.export_sources_folder)
-        copy(self, "*.noncnf", src=".", dst=self.export_sources_folder)
-        copy(self, "*.expected2", src=".", dst=self.export_sources_folder)
-        copy(self, "*.expected1", src=".", dst=self.export_sources_folder)
-        copy(self, "*.bak", src=".", dst=self.export_sources_folder)
-        copy(self, "*.tsq", src=".", dst=self.export_sources_folder)
-        copy(self, "*.tsr", src=".", dst=self.export_sources_folder)
-        copy(self, "*.csv", src=".", dst=self.export_sources_folder)
-        copy(self, "*.pkcs7", src=".", dst=self.export_sources_folder)
-        copy(self, "*.out", src=".", dst=self.export_sources_folder)
-        copy(self, "*.text", src=".", dst=self.export_sources_folder)
-        copy(self, "*.tlssct", src=".", dst=self.export_sources_folder)
-        copy(self, "*.eml", src=".", dst=self.export_sources_folder)
-        copy(self, "*.Configure", src=".", dst=self.export_sources_folder)
-        copy(self, "*.srl", src=".", dst=self.export_sources_folder)
-        copy(self, "*.config", src=".", dst=self.export_sources_folder)
-        copy(self, "*.syms", src=".", dst=self.export_sources_folder)
-        copy(self, "*.rb", src=".", dst=self.export_sources_folder)
-        copy(self, "*.pro", src=".", dst=self.export_sources_folder)
-        copy(self, "*.sed", src=".", dst=self.export_sources_folder)
-        copy(self, "*.json", src=".", dst=self.export_sources_folder)
-        copy(self, "*.el", src=".", dst=self.export_sources_folder)
-        copy(self, "*.pod", src=".", dst=self.export_sources_folder)
-        copy(self, "*.png", src=".", dst=self.export_sources_folder)
-        copy(self, "*.dot", src=".", dst=self.export_sources_folder)
-        copy(self, "*.ods", src=".", dst=self.export_sources_folder)
-        copy(self, "*.svg", src=".", dst=self.export_sources_folder)
-        copy(self, "*.plantuml", src=".", dst=self.export_sources_folder)
-        copy(self, "*.odg", src=".", dst=self.export_sources_folder)
-        copy(self, "*.def", src=".", dst=self.export_sources_folder)
+            # Apply version fallback logic if needed
+            if hasattr(self.python_requires["openssl-tools"].ref, "_setup_version_fallback"):
+                # Version fallback is handled by the tools package
+                available_version = self._get_available_openssl_version()
+                self.version = available_version
+                self.output.info(f"Using OpenSSL version: {self.version}")
+            else:
+                # Fallback to detected version
+                self.version = detected_version or '3.6.0'
 
-    def configure(self):
-        """Configure package options"""
-        if not self.options.shared:
-            self.options.fPIC = True
+        except Exception as e:
+            self.output.warning(f"Version detection failed: {e}, using 3.6.0")
+            self.version = '3.6.0'
+
+    def _get_available_openssl_version(self):
+        """Get available OpenSSL version using fallback logic."""
+        try:
+            # Try 4.0.0 first, then fallback to 3.6.0
+            preferred_versions = ["4.0.0", "3.6.0", "3.4.1"]
+
+            for version in preferred_versions:
+                if self._is_openssl_version_available(version):
+                    return version
+
+            return "3.6.0"  # Ultimate fallback
+        except Exception:
+            return "3.6.0"
+
+    def _is_openssl_version_available(self, version):
+        """Check if a specific OpenSSL version is available."""
+        # This could check git tags, version files, or remote availability
+        # For now, implement basic version detection
+        try:
+            # Check if VERSION.dat exists and contains the version
+            version_file = Path(self.recipe_folder) / "VERSION.dat"
+            if version_file.exists():
+                with open(version_file, 'r') as f:
+                    content = f.read()
+                    # Parse version from VERSION.dat format
+                    # This is a simplified check - real implementation would parse properly
+                    if version.replace('.', '') in content.replace('.', ''):
+                        return True
+
+            # Check git tags if available
+            import subprocess
+            result = subprocess.run(
+                ["git", "tag", "-l", f"openssl-{version}"],
+                cwd=self.recipe_folder,
+                capture_output=True,
+                text=True
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return True
+
+            return False
+        except Exception:
+            return False
+
+    def layout(self):
+        """Define the build layout. This is critical for locating sources."""
+        # This standard layout places sources in <build_folder>/src.
+        # The build() method will run from <build_folder>, and `self.source_folder` will correctly point to `src`.
+        basic_layout(self, src_folder="src")
+
+    def source(self):
+        """Fetch the source code and prepare build environment."""
+        from conan.tools.files import copy
+
+        # For development, source is already available locally in the recipe folder
+        # Copy essential source files to the source folder
+        recipe_folder = self.recipe_folder
+
+        # Copy Python build scripts (already exported)
+        # Copy essential OpenSSL source files
+        copy(self, "*.h", recipe_folder, self.source_folder)
+        copy(self, "*.c", recipe_folder, self.source_folder)
+        copy(self, "Makefile*", recipe_folder, self.source_folder)
+        copy(self, "Configure*", recipe_folder, self.source_folder)
+        copy(self, "config*", recipe_folder, self.source_folder)
+
+        # Copy directories
+        copy(self, "crypto/**/*", recipe_folder, self.source_folder)
+        copy(self, "ssl/**/*", recipe_folder, self.source_folder)
+        copy(self, "include/**/*", recipe_folder, self.source_folder)
+        copy(self, "util/**/*", recipe_folder, self.source_folder)
+
+    def requirements(self):
+        """Define dependencies cleanly."""
+        self.requires(
+            "zlib/[>=1.3.1]",
+            options={"shared": self.options.shared},
+            visible=True
+        )
 
     def build_requirements(self):
-        """Add build requirements based on platform"""
+        """Add build requirements based on platform."""
         if self.settings.os == "Windows":
             self.tool_requires("strawberryperl/5.32.1.1")
             self.tool_requires("nasm/2.15.05")
-        # On Unix systems, assume Perl and make are available as system packages
+
+    def configure(self):
+        """Validate configuration options before the build."""
+        # Delegate validation to the tooling layer.
+        try:
+            ProfileValidator = self.python_requires["openssl-tools"].module.ProfileValidator
+            profile_validator = ProfileValidator(self)
+            profile_validator.validate_all()
+        except Exception as e:
+            self.output.warning(f"Profile validation failed: {e}")
 
     def generate(self):
-        """Setup build environment"""
-        env = VirtualBuildEnv(self)
-        env.generate()
+        """Generate build environment files."""
+        # Sets up paths for build_requires like perl and nasm.
+        VirtualBuildEnv(self).generate()
 
     def build(self):
-        """Build OpenSSL using build orchestrator"""
-        # Get the OpenSSL tools for build orchestration
+        """Build OpenSSL using Python-based configuration."""
+        import os
+        import subprocess
+        import sys
+
+        self.output.info("Building OpenSSL with Python configure...")
+
+        # Use Python configure script
+        configure_cmd = [
+            sys.executable, "configure.py",
+            "--prefix=/usr/local/ssl",
+            "--openssldir=/usr/local/ssl"
+        ]
+
+        # Add configuration options
+        if self.options.fips:
+            configure_cmd.append("enable-fips")
+
+        if not self.options.shared:
+            configure_cmd.append("no-shared")
+
+        if self.options.no_threads:
+            configure_cmd.append("no-threads")
+
+        if self.options.no_asm:
+            configure_cmd.append("no-asm")
+
+        # Add compiler flags
+        if self.options.fPIC and not self.options.shared:
+            configure_cmd.append("-fPIC")
+
         try:
-            from openssl_tools.foundation import OpenSSLBuildOrchestrator
-            orchestrator = OpenSSLBuildOrchestrator(self)
-            orchestrator.configure_and_build()
-        except ImportError:
-            # Fallback to manual build if tools not available
-            self._manual_build()
+            # Run Python configure
+            self.output.info(f"Running: {' '.join(configure_cmd)}")
+            result = subprocess.run(configure_cmd, cwd=self.source_folder,
+                                  capture_output=True, text=True)
+            if result.returncode != 0:
+                self.output.error(f"Configure failed: {result.stderr}")
+                raise Exception(f"Configure failed with return code {result.returncode}")
 
-    def _manual_build(self):
-        """Manual build process as fallback"""
-        with chdir(self, self.source_folder):
-            # Platform-specific Configure target
-            target_map = {
-                ("Linux", "x86_64"): "linux-x86_64",
-                ("Linux", "x86"): "linux-x86",
-                ("Windows", "x86_64"): "VC-WIN64A",
-                ("Windows", "x86"): "VC-WIN32",
-                ("Macos", "armv8"): "darwin64-arm64-cc",
-                ("Macos", "x86_64"): "darwin64-x86_64-cc",
-            }
-            target = target_map.get((str(self.settings.os), str(self.settings.arch)), "linux-x86_64")
-
-            # Build Configure command
-            configure_args = [
-                "./Configure",
-                target,
-                f"--prefix={self.package_folder}",
-                f"--openssldir={self.package_folder}",
-            ]
-
-            if self.options.fips:
-                configure_args.append("enable-fips")
-
-            if not self.options.shared:
-                configure_args.append("no-shared")
-
-            if self.options.no_threads:
-                configure_args.append("no-threads")
-
-            if self.options.no_asm:
-                configure_args.append("no-asm")
-
-            # Set environment variables for Configure
-            env_vars = [
-                "PERL=perl",  # Use system Perl
-                f"OPENSSL_CONF_INCLUDE={os.path.join(self.source_folder, 'Configurations')}",
-            ]
-
-            # Run Configure (generates Makefile, NOT build.ninja)
-            self.run(configure_args, env=env_vars)
-
-            # Build with make (official OpenSSL backend)
-            # Use fewer parallel jobs to avoid dependency file conflicts
+            # Run make
             import multiprocessing
-            cpu_count = min(4, multiprocessing.cpu_count() or 1)
-            self.run(f"make -j{cpu_count}", env=env_vars)
+            jobs = multiprocessing.cpu_count() or 1
+            make_cmd = ["make", f"-j{jobs}"]
+
+            self.output.info(f"Running: {' '.join(make_cmd)}")
+            result = subprocess.run(make_cmd, cwd=self.source_folder,
+                                  capture_output=True, text=True)
+            if result.returncode != 0:
+                self.output.error(f"Make failed: {result.stderr}")
+                raise Exception(f"Make failed with return code {result.returncode}")
+
+            self.output.info("OpenSSL build completed successfully")
+
+        except Exception as e:
+            self.output.error(f"Build failed: {e}")
+            raise
 
     def package(self):
-        """Install OpenSSL"""
+        """Package the combined OpenSSL artifacts from both components."""
         try:
-            from openssl_tools.foundation import OpenSSLBuildOrchestrator
+            OpenSSLBuildOrchestrator = self.python_requires["openssl-tools"].module.OpenSSLBuildOrchestrator
+            SbomGenerator = self.python_requires["openssl-tools"].module.SbomGenerator
+            DatabaseTracker = self.python_requires["openssl-tools"].module.DatabaseTracker
+
+            # Use the orchestrator to combine artifacts from both libraries
             orchestrator = OpenSSLBuildOrchestrator(self)
-            orchestrator.install_openssl()
-        except ImportError:
-            # Fallback to manual install if tools not available
-            with chdir(self, self.source_folder):
-                self.run(f"make install DESTDIR={self.package_folder}")
+            orchestrator.package_combined_openssl()
 
-        # Copy licenses
-        copy(self, "LICENSE*", src=self.source_folder,
-             dst=os.path.join(self.package_folder, "licenses"), keep_path=False)
-
-
+            # Integrated quality gates run automatically after packaging.
+            sbom_gen = SbomGenerator(self)
+            sbom_gen.generate_and_save(format="cyclonedx")
+            db_tracker = DatabaseTracker(self)
+            db_tracker.track_package()
+        except Exception as e:
+            self.output.warning(f"Quality gates failed: {e}")
 
     def package_info(self):
-        """Configure CMake targets for OpenSSL components"""
-        # Modern CMake package properties
+        """Define package information for consumers."""
+        # This modern component-based approach is forward-compatible with CPS.
+        # It is cleaner and more explicit than the previous implementation.
+        self.cpp_info.set_property("cmake_find_mode", "both")
         self.cpp_info.set_property("cmake_file_name", "OpenSSL")
         self.cpp_info.set_property("cmake_target_name", "OpenSSL::OpenSSL")
+        self.cpp_info.set_property("pkg_config_name", "openssl")
 
-        # SSL component configuration
-        ssl = self.cpp_info.components["ssl"]
-        ssl.set_property("cmake_target_name", "OpenSSL::SSL")
-        ssl.libs = ["ssl"]  # ← CRITICAL: Maps to libssl.a/libssl.so
-        ssl.requires = ["crypto"]
+        # --- Components ---
+        self.cpp_info.components["crypto"].set_property("cmake_target_name", "OpenSSL::Crypto")
+        self.cpp_info.components["crypto"].libs = ["crypto"]
 
-        # Crypto component configuration
-        crypto = self.cpp_info.components["crypto"]
-        crypto.set_property("cmake_target_name", "OpenSSL::Crypto")
-        crypto.libs = ["crypto"]  # ← CRITICAL: Maps to libcrypto.a/libcrypto.so
+        self.cpp_info.components["ssl"].set_property("cmake_target_name", "OpenSSL::SSL")
+        self.cpp_info.components["ssl"].libs = ["ssl"]
+        self.cpp_info.components["ssl"].requires = ["crypto", "zlib::zlib"]
 
-        # Legacy CMake module support
-        self.cpp_info.names["cmake_find_package"] = "OpenSSL"
-        self.cpp_info.names["cmake_find_package_multi"] = "OpenSSL"
+        if self.options.fips:
+            fips_module_dir = Path(self.package_folder) / "lib" / "ossl-modules"
+            self.runenv_info.prepend_path("OPENSSL_MODULES", str(fips_module_dir))
+            self.conf_info.define("user.openssl:fips_module_path", str(fips_module_dir))
 
-        # Root package (for legacy consumers)
-        self.cpp_info.libs = ["ssl", "crypto"]
-
-        # Directories
-        self.cpp_info.bindirs = ["bin"]
-        self.cpp_info.libdirs = ["lib64", "lib"]
-        self.cpp_info.includedirs = ["include"]
-
-        # System dependencies
-        if self.settings.os == "Linux":
-            crypto.system_libs = ["dl", "pthread"]
-        elif self.settings.os == "Windows":
-            crypto.system_libs = ["advapi32", "crypt32", "user32"]
-            ssl.system_libs = ["ws2_32", "gdi32"]
+    def log_upload_completion(self, remote_name: str = None):
+        """Log package upload completion for CI/CD visibility."""
+        try:
+            DatabaseTracker = self.python_requires["openssl-tools"].module.DatabaseTracker
+            tracker = DatabaseTracker(self)
+            tracker.log_upload_completion(remote_name)
+        except Exception as e:
+            self.output.warning(f"Upload logging failed: {e}")

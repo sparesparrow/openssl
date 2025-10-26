@@ -20,8 +20,8 @@ void test_library_linking() {
     const char* version = OpenSSL_version(OPENSSL_VERSION);
     std::cout << "✓ OpenSSL version: " << version << std::endl;
 
-    // Test SSL library
-    const char* ssl_version = OpenSSL_version(OPENSSL_SSL_VERSION);
+    // Test SSL library (OpenSSL 3.x compatible)
+    const char* ssl_version = OpenSSL_version(OPENSSL_VERSION);
     std::cout << "✓ SSL version: " << ssl_version << std::endl;
 }
 
@@ -105,12 +105,12 @@ void test_fips_mode() {
         std::cout << "ℹ FIPS provider not available (this is normal for non-FIPS builds)" << std::endl;
     }
 
-    // Check FIPS mode status
-    int fips_mode = FIPS_mode();
-    if (fips_mode) {
-        std::cout << "✓ FIPS mode is enabled" << std::endl;
+    // Check FIPS mode status (OpenSSL 3.x compatible)
+    // Note: FIPS_mode() is deprecated in OpenSSL 3.x, using provider check instead
+    if (fips_provider != nullptr) {
+        std::cout << "✓ FIPS mode is available via provider" << std::endl;
     } else {
-        std::cout << "ℹ FIPS mode is disabled (normal for non-FIPS builds)" << std::endl;
+        std::cout << "ℹ FIPS mode is not available (normal for non-FIPS builds)" << std::endl;
     }
 }
 
