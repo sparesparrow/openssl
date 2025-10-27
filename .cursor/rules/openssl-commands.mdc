@@ -1,14 +1,63 @@
 ---
-description: OpenSSL-specific operations and workflows for building, testing, and deploying components
-globs: ["openssl-*/**", "scripts/**", "conanfile.py", "*.sh"]
+description: OpenSSL-specific operations and workflows for building, testing, and deploying components with CPS integration
+globs: ["openssl-*/**", "scripts/**", "conanfile.py", "*.sh", "configure.py", "libcrypto/**", "libssl/**"]
 alwaysApply: true
 category: "OpenSSL Commands"
-version: "1.0.0"
+version: "2.0.0"
 ---
 
 # OpenSSL Commands
 
-OpenSSL-specific operations and workflows for building, testing, and deploying components.
+OpenSSL-specific operations and workflows for building, testing, and deploying components with CPS integration and component-based packaging.
+
+## CPS Integration Commands
+
+### 📋 Generate CPS File
+- **ID**: `openssl.generate-cps`
+- **Description**: Generate Common Package Specification file
+- **Command**: `python -c "from conanfile import OpenSSLConan; OpenSSLConan()._generate_cps_file()"`
+- **Category**: CPS
+- **Group**: openssl
+- **Shortcut**: `Ctrl+Shift+C`
+
+### 🔧 Python Configure
+- **ID**: `openssl.python-configure`
+- **Description**: Run Python configure script with platform detection
+- **Command**: `python3 configure.py linux-x86_64 --prefix=/usr/local/ssl`
+- **Category**: Configuration
+- **Group**: openssl
+- **Shortcut**: `Ctrl+Shift+P`
+
+### 🏗️ Modern CMake Build
+- **ID**: `openssl.cmake-build`
+- **Description**: Build with CMakeToolchain and CMakeDeps
+- **Command**: `conan install . --build=missing && cmake --preset conan-release && cmake --build --preset conan-release`
+- **Category**: Build
+- **Group**: openssl
+- **Shortcut**: `Ctrl+Shift+B`
+
+## Component Testing Commands
+
+### 🧪 Test Crypto Component
+- **ID**: `openssl.test-crypto`
+- **Description**: Test libcrypto component only
+- **Command**: `conan test test_package . --profile=default -o openssl:shared=False`
+- **Category**: Testing
+- **Group**: openssl
+
+### 🧪 Test SSL Component
+- **ID**: `openssl.test-ssl`
+- **Description**: Test libssl component with crypto dependency
+- **Command**: `conan test test_package . --profile=default -o openssl:shared=True`
+- **Category**: Testing
+- **Group**: openssl
+
+### 🔍 Validate CPS File
+- **ID**: `openssl.validate-cps`
+- **Description**: Validate CPS file format and component structure
+- **Command**: `python -c "import json; cps=json.load(open('openssl.cps')); print('Components:', list(cps['components'].keys()))"`
+- **Category**: CPS
+- **Group**: openssl
 
 ## Build Commands
 

@@ -1,7 +1,8 @@
 from conan import ConanFile
-from conan.tools.gnu import Autotools
+from conan.tools.cmake import CMake, CMakeToolchain, CMakeDeps
 from conan.tools.files import copy
 import os
+import json
 
 class OpenSSLConan(ConanFile):
     name = "openssl"
@@ -31,7 +32,7 @@ class OpenSSLConan(ConanFile):
                 self.version = version
         else:
             # Fallback version if VERSION.dat not found
-            self.version = "4.0.3"
+            self.version = "4.0.4"
 
     # Package metadata
     description = "OpenSSL cryptographic library"
@@ -45,19 +46,22 @@ class OpenSSLConan(ConanFile):
     options = {
         "shared": [True, False],
         "fPIC": [True, False],
+        "fips": [True, False],
+        "no_threads": [True, False],
     }
     default_options = {
         "shared": True,
         "fPIC": True,
+        "fips": False,
+        "no_threads": False,
     }
 
     requires = [
-        "openssl-profiles/2.0.0",  # Merged base + fips
-        "openssl-tools/1.2.4"
+        "openssl-profiles/2.0.2",  # Merged base + fips
     ]
 
     python_requires = [
-        "openssl-tools/1.2.4"
+        "openssl-conan-base/1.0.1@sparesparrow/stable",  # Foundation layer
     ]
 
     def configure(self):
@@ -163,33 +167,82 @@ class OpenSSLConan(ConanFile):
         # In-tree, zdroje již přítomny
         pass
 
+    def generate(self):
+        """Generate build files using modern CMake integration (CppCon 2024 approach)"""
+        # Use Python configure.py to generate Makefile and CPS file
+        configure_cmd = "python3 configure.py"
+        configure_args = [
+            "linux-x86_64",  # Target platform
+        ]
+
+        if self.options.shared:
+            configure_args.append("shared")
+        else:
+            configure_args.append("no-shared")
+
+        if self.options.no_threads:
+            configure_args.append("no-threads")
+
+        if self.options.fips:
+            configure_args.append("enable-fips")
+
+        if not self.options.fPIC:
+            configure_args.append("no-pic")
+
+        # Run Python configure (generates Makefile and CPS file)
+        self.run(f"{configure_cmd} {' '.join(configure_args)}", cwd=self.source_folder)
+
+        # Generate CMake toolchain for consumers
+        tc = CMakeToolchain(self)
+        tc.variables["OPENSSL_ROOT_DIR"] = "/usr/local/ssl"
+        tc.variables["OPENSSL_SHARED"] = self.options.shared
+        tc.variables["OPENSSL_FIPS"] = self.options.fips
+        tc.variables["OPENSSL_NO_THREADS"] = self.options.no_threads
+        tc.generate()
+
+        # Generate CMake dependencies
+        deps = CMakeDeps(self)
+        deps.set_property("openssl", "cmake_target_name", "OpenSSL::OpenSSL")
+        deps.generate()
+
     def build(self):
-        # Basic OpenSSL build - can be enhanced later
+        """Build OpenSSL using proper build commands"""
         self.output.info("Building OpenSSL...")
-        # For now, just create a placeholder
-        pass
+
+        # For now, let's use the traditional OpenSSL build approach
+        # since the Python configure.py is just a stub
+        if not os.path.exists(os.path.join(self.source_folder, "Makefile")):
+            # Fall back to traditional configure if Makefile doesn't exist
+            configure_cmd = "./Configure"
+            configure_args = [
+                "linux-x86_64",
+                "shared",
+                "--prefix=/usr/local/ssl",
+                "--openssldir=/usr/local/ssl",
+            ]
+
+            self.run(f"{configure_cmd} {' '.join(configure_args)}", cwd=self.source_folder)
+
+        # Build using make
+        self.run("make", cwd=self.source_folder)
 
     def package(self):
         """Package OpenSSL properly to package folder"""
-        # Install to a staging directory first
-        staging = os.path.join(self.build_folder, "staging")
-        self.run(f"make install DESTDIR={staging}", cwd=self.source_folder)
+        # For now, let's copy the built artifacts directly from the build directory
+        # since the make install isn't working in the container environment
 
-        # Copy from staging to package folder
-        install_prefix = os.path.join(staging, "usr/local/ssl")
+        # Copy libraries from build directory (they should be in the build root or lib/)
+        lib_patterns = ["*.so*", "*.a", "libssl*", "libcrypto*"]
+        for pattern in lib_patterns:
+            copy(self, pattern, src=self.build_folder,
+                 dst=os.path.join(self.package_folder, "lib"), keep_path=False)
 
-        # Libraries
-        copy(self, "*.so*", src=os.path.join(install_prefix, "lib"),
-             dst=os.path.join(self.package_folder, "lib"), keep_path=False)
-        copy(self, "*.a", src=os.path.join(install_prefix, "lib"),
-             dst=os.path.join(self.package_folder, "lib"), keep_path=False)
-
-        # Headers
-        copy(self, "*.h", src=os.path.join(install_prefix, "include"),
+        # Copy headers
+        copy(self, "*.h", src=os.path.join(self.build_folder, "include"),
              dst=os.path.join(self.package_folder, "include"), keep_path=True)
 
-        # Binaries
-        copy(self, "openssl", src=os.path.join(install_prefix, "bin"),
+        # Copy openssl binary
+        copy(self, "openssl", src=os.path.join(self.build_folder, "apps"),
              dst=os.path.join(self.package_folder, "bin"), keep_path=False)
 
         # License
@@ -199,11 +252,12 @@ class OpenSSLConan(ConanFile):
         self.output.info("Packaging OpenSSL completed")
 
     def package_info(self):
-        """Proper package info for CMake integration"""
+        """Proper package info for CMake integration with modern Conan 2.x approach"""
+        # Main OpenSSL target
         self.cpp_info.set_property("cmake_file_name", "OpenSSL")
         self.cpp_info.set_property("cmake_target_name", "OpenSSL::OpenSSL")
 
-        # Libraries
+        # Libraries in correct dependency order (ssl depends on crypto)
         self.cpp_info.libs = ["ssl", "crypto"]
 
         # Paths
@@ -211,13 +265,80 @@ class OpenSSLConan(ConanFile):
         self.cpp_info.includedirs = ["include"]
         self.cpp_info.libdirs = ["lib"]
 
-        # System dependencies
+        # System dependencies based on platform
         if self.settings.os == "Linux":
-            self.cpp_info.system_libs.extend(["dl", "pthread"])
+            self.cpp_info.system_libs = ["dl", "pthread"]
         elif self.settings.os == "Windows":
-            self.cpp_info.system_libs.extend(["ws2_32", "gdi32", "advapi32", "crypt32", "user32"])
+            self.cpp_info.system_libs = ["ws2_32", "gdi32", "advapi32", "crypt32", "user32"]
         elif self.settings.os == "Macos":
-            self.cpp_info.frameworks.append("Security")
+            self.cpp_info.frameworks = ["CoreFoundation", "Security"]
 
-        # Environment
-        self.runenv_info.prepend_path("PATH", os.path.join(self.package_folder, "bin"))
+        # Define components for better CMake integration (following CppCon modular approach)
+        # SSL component
+        self.cpp_info.components["ssl"].libs = ["ssl"]
+        self.cpp_info.components["ssl"].requires = ["crypto"]
+        self.cpp_info.components["ssl"].set_property("cmake_target_name", "OpenSSL::SSL")
+
+        # Crypto component
+        self.cpp_info.components["crypto"].libs = ["crypto"]
+        self.cpp_info.components["crypto"].set_property("cmake_target_name", "OpenSSL::Crypto")
+
+        # Environment variables for runtime
+        self.runenv_info.append_path("PATH", "bin")
+
+        # Generate CPS file for modern build system interoperability
+        self._generate_cps_file()
+
+    def _generate_cps_file(self):
+        """Generate Common Package Specification file for build system interoperability"""
+        cps_data = {
+            "cps_version": "0.13.0",
+            "name": self.name,
+            "version": self.version,
+            "description": self.description,
+            "license": self.license,
+            "components": {
+                "crypto": {
+                    "type": "library",
+                    "location": "@prefix@/lib/libcrypto.a",
+                    "includes": ["@prefix@/include"],
+                    "defines": ["OPENSSL_USE_NODELETE"] if self.options.shared else []
+                },
+                "ssl": {
+                    "type": "library",
+                    "location": "@prefix@/lib/libssl.a",
+                    "includes": ["@prefix@/include"],
+                    "requires": ["crypto"],
+                    "defines": ["OPENSSL_USE_NODELETE"] if self.options.shared else []
+                }
+            },
+            "properties": {
+                "cmake_find_module_name": "OpenSSL",
+                "cmake_target:crypto": "OpenSSL::Crypto",
+                "cmake_target:ssl": "OpenSSL::SSL",
+                "cmake_target:openssl": "OpenSSL::OpenSSL"
+            },
+            "system_libs": self._get_system_libs(),
+            "frameworks": self._get_frameworks()
+        }
+
+        # Write CPS file to package folder
+        cps_file = os.path.join(self.package_folder, f"{self.name}.cps")
+        with open(cps_file, 'w') as f:
+            json.dump(cps_data, f, indent=2)
+
+        self.output.info(f"Generated CPS file: {cps_file}")
+
+    def _get_system_libs(self):
+        """Get system libraries based on platform"""
+        if self.settings.os == "Linux":
+            return ["dl", "pthread"]
+        elif self.settings.os == "Windows":
+            return ["ws2_32", "gdi32", "advapi32", "crypt32", "user32"]
+        return []
+
+    def _get_frameworks(self):
+        """Get frameworks for macOS"""
+        if self.settings.os == "Macos":
+            return ["CoreFoundation", "Security"]
+        return []

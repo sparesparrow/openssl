@@ -6,6 +6,7 @@ Configures OpenSSL build system with Python-based approach.
 """
 
 import argparse
+import json
 import os
 import platform
 import subprocess
@@ -342,11 +343,48 @@ install:
         # Generate configuration files
         self.generate_config_files()
 
+        # Generate CPS file for modern build system integration
+        self.generate_cps_file()
+
         # Show summary
         if not self.quiet:
             self.show_configuration_summary()
 
         return 0
+
+    def generate_cps_file(self) -> None:
+        """Generate CPS file for modern build system integration (CppCon 2024 approach)"""
+        cps_data = {
+            "cps_version": "0.13.0",
+            "name": "openssl",
+            "version": "4.0.4-dev",
+            "components": {
+                "crypto": {
+                    "type": "library",
+                    "location": "@prefix@/lib/libcrypto.a",
+                    "includes": ["@prefix@/include"],
+                    "defines": ["OPENSSL_USE_NODELETE"]
+                },
+                "ssl": {
+                    "type": "library",
+                    "location": "@prefix@/lib/libssl.a",
+                    "includes": ["@prefix@/include"],
+                    "requires": ["crypto"]
+                }
+            },
+            "properties": {
+                "cmake_find_module_name": "OpenSSL",
+                "cmake_target:crypto": "OpenSSL::Crypto",
+                "cmake_target:ssl": "OpenSSL::SSL",
+                "cmake_target:openssl": "OpenSSL::OpenSSL"
+            }
+        }
+
+        cps_file = os.path.join(os.getcwd(), "openssl.cps")
+        with open(cps_file, 'w') as f:
+            json.dump(cps_data, f, indent=2)
+
+        print(f"Generated CPS file: {cps_file}")
 
 
 def main():

@@ -438,8 +438,16 @@ compile_commands.json
 
 # IDE-specific directories (personal preferences)
 .cursor2/
+.cursor/
 .vscode/
 .idea/
+
+# Build artifacts and temporary files
+build-release/
+fips-artifacts/
+test-artifacts/
+build.ninja*
+*.ninja
 
 # Conan
 .conan/
@@ -457,3 +465,4 @@ conanrun.sh
 conanrunenv-release-x86_64.sh
 deactivate_conanbuild.sh
 deactivate_conanrun.sh
+deactivate_conanbuildenv-release-x86_64.sh

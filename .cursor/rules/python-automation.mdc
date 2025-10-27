@@ -1,12 +1,80 @@
 ---
-description: Python automation patterns for OpenSSL (scripts, conan, monitoring)
-globs: ["scripts/**/*.py", "**/conanfile.py", "conan/**", ".github/workflows/**/*.yml", "**/*.py", "**/requirements*.txt", "pyproject.toml"]
+description: Python automation patterns for OpenSSL (scripts, conan, monitoring, CPS integration)
+globs: ["scripts/**/*.py", "**/conanfile.py", "conan/**", ".github/workflows/**/*.yml", "**/*.py", "**/requirements*.txt", "pyproject.toml", "configure.py", "libcrypto/**", "libssl/**"]
 alwaysApply: false
 ---
 
 # Python Automation Best Practices Rules
 
-Based on analysis of oms-dev project and Michal's automation engineering patterns.
+Based on analysis of oms-dev project, Michal's automation engineering patterns, and Diego's CppCon 2024 component-based packaging patterns.
+
+## CPS Integration Patterns
+
+### CPS File Generation
+```python
+def generate_cps_file(self):
+    """Generate CPS file for modern build system integration"""
+    cps_data = {
+        "cps_version": "0.13.0",
+        "name": self.name,
+        "version": self.version,
+        "components": self._get_component_data(),
+        "properties": self._get_cmake_properties()
+    }
+
+    with open(f'{self.name}.cps', 'w') as f:
+        json.dump(cps_data, f, indent=2)
+
+def _get_component_data(self):
+    """Extract component data from package_info"""
+    components = {}
+    for comp_name, comp_info in self.cpp_info.components.items():
+        components[comp_name] = {
+            "type": "library",
+            "location": f"@prefix@/lib/lib{comp_name}.a",
+            "includes": ["@prefix@/include"],
+            "requires": comp_info.requires if hasattr(comp_info, 'requires') else []
+        }
+    return components
+```
+
+### Python Configure Integration
+```python
+def integrate_python_configure(self):
+    """Integrate Python configure script with Conan build"""
+    configure_cmd = "python3 configure.py"
+    configure_args = self._build_configure_args()
+
+    # Run Python configure
+    self.run(f"{configure_cmd} {' '.join(configure_args)}", cwd=self.source_folder)
+
+    # Generate CMake files
+    self._generate_cmake_files()
+
+def _build_configure_args(self):
+    """Build configure arguments based on options"""
+    args = [self._detect_platform()]
+    args.extend(self._get_prefix_args())
+    args.extend(self._get_feature_args())
+    return args
+```
+
+### Component-Based Package Management
+```python
+def manage_component_packages(self):
+    """Manage libssl/libcrypto component packages"""
+    components = ["crypto", "ssl"]
+
+    for component in components:
+        self._create_component_package(component)
+        self._test_component_package(component)
+        self._generate_component_cps(component)
+
+def _create_component_package(self, component_name):
+    """Create individual component package"""
+    # Implementation for component-specific packaging
+    pass
+```
 
 ## Python Development Standards
 

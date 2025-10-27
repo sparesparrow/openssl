@@ -1,12 +1,93 @@
 ---
-description: Conan DevOps best practices for OpenSSL (packaging, profiles, caching)
-globs: ["conanfile.py", "conan/**", "conan-profiles/**/*.profile", "**/profiles/*.profile", "scripts/**/*.py", ".github/workflows/**/*.yml"]
+description: Conan DevOps best practices for OpenSSL (packaging, profiles, caching, CPS integration, component-based architecture)
+globs: ["conanfile.py", "conan/**", "conan-profiles/**/*.profile", "**/profiles/*.profile", "scripts/**/*.py", ".github/workflows/**/*.yml", "configure.py", "libcrypto/**", "libssl/**"]
 alwaysApply: false
 ---
 
 # Conan DevOps Best Practices Rules
 
-Based on analysis of oms-dev project and Michal's DevOps engineering practices.
+Based on analysis of oms-dev project, Michal's DevOps engineering practices, and Diego's CppCon 2024 component-based packaging patterns.
+
+## Modern Conan 2.x Integration
+
+### CMake Integration with CPS Support
+- **Use CMakeToolchain + CMakeDeps** for modern CMake integration
+- **Generate CPS files** for future build system interoperability
+- **Implement component-based packaging** (libssl/libcrypto separation)
+- **Use Python configure script** instead of Perl Configure
+
+### Component-Based Architecture (Following Diego's CppCon 2024)
+```python
+def package_info(self):
+    # CPS-ready component structure
+    self.cpp_info.set_property("cmake_file_name", "OpenSSL")
+
+    # Define components following Diego's CppCon 2024 example
+    self.cpp_info.components["crypto"].libs = ["crypto"]
+    self.cpp_info.components["crypto"].set_property("cmake_target_name", "OpenSSL::Crypto")
+
+    self.cpp_info.components["ssl"].libs = ["ssl"]
+    self.cpp_info.components["ssl"].set_property("cmake_target_name", "OpenSSL::SSL")
+    self.cpp_info.components["ssl"].requires = ["crypto"]
+
+    # Generate CPS file for component metadata
+    self._generate_cps_file()
+```
+
+### Python Configure Integration
+```python
+def generate(self):
+    # Use Python configure script
+    configure_cmd = "python3 configure.py"
+    configure_args = ["linux-x86_64", "--prefix=/usr/local/ssl"]
+
+    if self.options.shared:
+        configure_args.append("shared")
+    else:
+        configure_args.append("no-shared")
+
+    self.run(f"{configure_cmd} {' '.join(configure_args)}", cwd=self.source_folder)
+
+    # Generate CMake toolchain
+    tc = CMakeToolchain(self)
+    tc.variables["OPENSSL_ROOT_DIR"] = "/usr/local/ssl"
+    tc.generate()
+
+    deps = CMakeDeps(self)
+    deps.generate()
+```
+
+### CPS File Generation
+```python
+def _generate_cps_file(self):
+    """Generate CPS file for modern build system integration"""
+    cps_data = {
+        "cps_version": "0.13.0",
+        "name": self.name,
+        "version": self.version,
+        "components": {
+            "crypto": {
+                "type": "library",
+                "location": "@prefix@/lib/libcrypto.a",
+                "includes": ["@prefix@/include"]
+            },
+            "ssl": {
+                "type": "library",
+                "location": "@prefix@/lib/libssl.a",
+                "includes": ["@prefix@/include"],
+                "requires": ["crypto"]
+            }
+        },
+        "properties": {
+            "cmake_find_module_name": "OpenSSL",
+            "cmake_target:crypto": "OpenSSL::Crypto",
+            "cmake_target:ssl": "OpenSSL::SSL"
+        }
+    }
+
+    with open(f'{self.name}.cps', 'w') as f:
+        json.dump(cps_data, f, indent=2)
+```
 
 ## Conan Package Management Rules
 
@@ -82,19 +163,19 @@ class OpenSSLConan(ConanFile):
     # Use proper metadata
     name = "openssl"
     version = "3.5.0"  # Dynamic from VERSION.dat
-    
+
     # Comprehensive options for flexibility
     options = {
         "shared": [True, False],
         "fips": [True, False],
         # ... other options
     }
-    
+
     def package_id(self):
         # Optimize for caching
         del self.info.options.build_tests
         # Group compatible configurations
-        
+
     def _generate_sbom(self):
         # Generate SBOM for supply chain security
         pass

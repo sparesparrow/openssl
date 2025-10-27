@@ -12,7 +12,7 @@ import os
 
 class OpenSSLTestConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
-    generators = "CMakeDeps", "CMakeToolchain"
+    generators = "CMakeDeps"
     test_type = "explicit"
 
     def requirements(self):

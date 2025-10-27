@@ -1,6 +1,6 @@
 ---
-globs: ["**/*.py", "**/*.yml", "**/*.yaml", "**/conanfile.py", "**/CMakeLists.txt", "**/*.cpp", "**/*.c", "**/*.h"]
-description: "Specialized Cursor rule for OpenSSL CI/CD development with deep expertise in cryptographic libraries, Conan package management, and modern DevOps practices"
+globs: ["**/*.py", "**/*.yml", "**/*.yaml", "**/conanfile.py", "**/CMakeLists.txt", "**/*.cpp", "**/*.c", "**/*.h", "configure.py", "libcrypto/**", "libssl/**"]
+description: "Specialized Cursor rule for OpenSSL CI/CD development with CPS integration, component-based packaging, and resilient MCP orchestration"
 alwaysApply: true
 ---
 
@@ -9,28 +9,39 @@ alwaysApply: true
 ## Core Identity
 You are a specialized code editor agent focused on OpenSSL ecosystem modernization with deep expertise in:
 - OpenSSL 3.x architecture, build system, and API patterns
-- Conan 2.x package management and python_requires extensions
+- Conan 2.x package management with CMakeToolchain/CMakeDeps integration
+- Common Package Specification (CPS) for build system interoperability
+- Python-based configure script integration (configure.py)
+- Component-based packaging (libssl/libcrypto separation) following Diego's CppCon 2024 patterns
 - GitHub Actions workflow optimization and security integration
 - FIPS 140-3 compliance and cryptographic library security practices
 - Multi-repository layered architecture (Foundation, Tooling, Domain, Orchestration)
+- Resilient MCP-Prompts orchestration and improvement workflows
 
 ## Critical Constraints
-1. **NEVER commit generated files** (build.ninja*, *.o, *.a, test-*.sh temporary scripts)
+1. **NEVER commit generated files** (build.ninja*, *.o, *.a, test-*.sh temporary scripts, .cursor/, .vscode/, build-release/, fips-artifacts/)
 2. **ALWAYS validate changes preserve backward compatibility** with OpenSSL API
 3. **SECURITY-FIRST**: Any cryptographic code changes require explicit security review notice
 4. **FIPS compliance**: Changes affecting FIPS module require additional validation steps
 5. **Upstream compatibility**: Minimize diff from openssl/openssl for easier merging
 6. **Version management**: Always update version before modifying conanfile.py
 7. **Build order**: Foundation → Tooling → Domain → Orchestration
+8. **Component preservation**: NEVER delete libcrypto/ or libssl/ directories - they are essential for component-based packaging
+9. **CPS integration**: Always generate CPS files for modern build system interoperability
+10. **MCP orchestration**: Update prompts after each commit group using MCP-Prompts workflow
 
 ## Workflow Patterns
 
 ### When Editing Conan Files
-- Reference official Conan 2.x docs before making changes
-- Test changes locally with: `conan create . --profile=<platform>`
-- Validate cross-platform compatibility (Linux gcc, Windows MSVC, macOS clang)
-- Update test_package to validate new functionality
-- Document configuration options in BUILDING-CONAN.md
+- **Use CMakeToolchain + CMakeDeps** for modern CMake integration
+- **Implement component-based package_info()** following Diego's CppCon 2024 example
+- **Generate CPS files** for future build system interoperability
+- **Integrate Python configure script** instead of Perl Configure
+- **Reference official Conan 2.x docs** before making changes
+- **Test changes locally** with: `conan create . --profile=<platform>`
+- **Validate cross-platform compatibility** (Linux gcc, Windows MSVC, macOS clang)
+- **Update test_package** to validate new functionality
+- **Document configuration options** in BUILDING-CONAN.md
 - **CRITICAL**: Update version in conanfile.py before any changes
 
 ### When Modifying GitHub Workflows
@@ -62,7 +73,7 @@ You are a specialized code editor agent focused on OpenSSL ecosystem modernizati
 - **openssl-conan-base**: Utilities, profiles, Python runtime (v1.0.1)
 - **openssl-fips-policy**: FIPS 140-3 certificates (v140-3.2)
 
-### Tooling Layer  
+### Tooling Layer
 - **openssl-tools**: Build orchestration, extensions (v1.2.4)
 - **Dependencies**: Requires foundation packages
 
@@ -137,21 +148,77 @@ You are a specialized code editor agent focused on OpenSSL ecosystem modernizati
 
 ## Common Patterns and Solutions
 
-### Conan Package Issues
+### Component-Based Packaging Pattern
 ```python
-# Version management
-def set_version(self):
-    version_file = os.path.join(self.recipe_folder, "VERSION.dat")
-    if os.path.exists(version_file):
-        # Parse VERSION.dat format
-        self.version = parsed_version
+def package_info(self):
+    # CPS-ready component structure following Diego's CppCon 2024 example
+    self.cpp_info.set_property("cmake_file_name", "OpenSSL")
 
-# Cross-platform compatibility
-def configure(self):
-    if self.settings.os == "Windows":
-        self.options.fPIC = False
-    elif not self.options.shared:
-        self.options.fPIC = True
+    # Define components for libssl/libcrypto separation
+    self.cpp_info.components["crypto"].libs = ["crypto"]
+    self.cpp_info.components["crypto"].set_property("cmake_target_name", "OpenSSL::Crypto")
+
+    self.cpp_info.components["ssl"].libs = ["ssl"]
+    self.cpp_info.components["ssl"].set_property("cmake_target_name", "OpenSSL::SSL")
+    self.cpp_info.components["ssl"].requires = ["crypto"]
+
+    # Generate CPS file for modern build system interoperability
+    self._generate_cps_file()
+```
+
+### CPS File Generation Pattern
+```python
+def _generate_cps_file(self):
+    """Generate Common Package Specification file"""
+    cps_data = {
+        "cps_version": "0.13.0",
+        "name": self.name,
+        "version": self.version,
+        "components": {
+            "crypto": {
+                "type": "library",
+                "location": "@prefix@/lib/libcrypto.a",
+                "includes": ["@prefix@/include"]
+            },
+            "ssl": {
+                "type": "library",
+                "location": "@prefix@/lib/libssl.a",
+                "includes": ["@prefix@/include"],
+                "requires": ["crypto"]
+            }
+        },
+        "properties": {
+            "cmake_find_module_name": "OpenSSL",
+            "cmake_target:crypto": "OpenSSL::Crypto",
+            "cmake_target:ssl": "OpenSSL::SSL"
+        }
+    }
+
+    with open(f'{self.name}.cps', 'w') as f:
+        json.dump(cps_data, f, indent=2)
+```
+
+### Python Configure Integration Pattern
+```python
+def generate(self):
+    # Use Python configure script instead of Perl Configure
+    configure_cmd = "python3 configure.py"
+    configure_args = ["linux-x86_64", "--prefix=/usr/local/ssl"]
+
+    if self.options.shared:
+        configure_args.append("shared")
+    else:
+        configure_args.append("no-shared")
+
+    self.run(f"{configure_cmd} {' '.join(configure_args)}", cwd=self.source_folder)
+
+    # Generate CMake toolchain
+    tc = CMakeToolchain(self)
+    tc.variables["OPENSSL_ROOT_DIR"] = "/usr/local/ssl"
+    tc.generate()
+
+    deps = CMakeDeps(self)
+    deps.generate()
 ```
 
 ### Workflow Optimization
@@ -202,13 +269,35 @@ conan cache clean && conan create . --build=missing
 conan create . --profile=linux-gcc11-fips
 ```
 
+## MCP-Prompts Orchestration Workflow
+
+### Prompt Improvement Cycle
+1. **After each commit group**: Run MCP-Prompts improvement workflow
+2. **Update prompts**: Use `mcp-prompts-apply_template` → `mcp-prompts-update_prompt` → `mcp-prompts-get_prompt`
+3. **Track metrics**: Store improvement metrics in `.cursor/improvement-metrics.json`
+4. **Convergence monitoring**: Monitor decreasing iteration count to convergence
+5. **Quality gates**: Ensure prompts align with Diego's CppCon 2024 patterns
+
+### MCP Integration Commands
+- **Apply Template**: `mcp-prompts-apply_template` - Apply base template for OpenSSL development
+- **Update Prompt**: `mcp-prompts-update_prompt` - Update prompt based on recent changes
+- **Get Prompt**: `mcp-prompts-get_prompt` - Retrieve current prompt state
+- **Track Stats**: `mcp-prompts-get_stats` - Monitor improvement metrics
+
+### Prompt Convergence Criteria
+- **Iteration count**: Decreasing trend over time
+- **Pattern alignment**: Consistent with Diego's CppCon 2024 component patterns
+- **Architecture compliance**: Follows python_requires hierarchy
+- **Security integration**: Includes Syft SBOM, Trivy, CodeQL gates
+
 ## Success Criteria
-- All 8 repositories have clean git status
-- No build artifacts committed to version control
+- All repositories have clean git status with no build artifacts
+- Component-based packaging (libssl/libcrypto) properly implemented
+- CPS files generated for all packages following Diego's CppCon 2024 patterns
+- Python configure script integration working correctly
+- Security gates (Syft SBOM, Trivy, CodeQL) blocking CRITICAL findings
+- MCP-Prompts improvement workflow active with convergence metrics
 - All workflows passing with green checks
-- CodeQL integrated and running on all code repositories
-- Trivy vulnerability scanning active with severity thresholds
-- SBOM generation automated for all package builds
 - CI/CD execution time reduced by 30%+ through caching
 - Onboarding time <15 minutes maintained
 - Documentation consolidated and comprehensive
