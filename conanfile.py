@@ -30,7 +30,10 @@ class OpenSSLConan(ConanFile):
     }
 
     # 💎 CENTRALIZED TOOLING: Using python_requires for build tools
-    python_requires = "openssl-tools/2.2.2"
+    python_requires = [
+        "openssl-tools/2.2.2@sparesparrow/stable",
+        "openssl-conan-base/1.1.0@sparesparrow/stable"
+    ]
 
     # Export Python build scripts
     exports = "configure.py", "util/python/*.py"
@@ -267,6 +270,66 @@ class OpenSSLConan(ConanFile):
             fips_module_dir = Path(self.package_folder) / "lib" / "ossl-modules"
             self.runenv_info.prepend_path("OPENSSL_MODULES", str(fips_module_dir))
             self.conf_info.define("user.openssl:fips_module_path", str(fips_module_dir))
+        
+        # Generate CPS file for modern build system interoperability
+        self._generate_cps_file()
+
+    def _generate_cps_file(self):
+        """Generate Common Package Specification file for build system interoperability"""
+        import json
+        import os
+        
+        cps_data = {
+            "cps_version": "0.13.0",
+            "name": self.name,
+            "version": self.version,
+            "description": self.description,
+            "license": self.license,
+            "components": {
+                "crypto": {
+                    "type": "library",
+                    "location": "@prefix@/lib/libcrypto.a",
+                    "includes": ["@prefix@/include"],
+                    "defines": ["OPENSSL_USE_NODELETE"] if self.options.shared else []
+                },
+                "ssl": {
+                    "type": "library",
+                    "location": "@prefix@/lib/libssl.a",
+                    "includes": ["@prefix@/include"],
+                    "requires": ["crypto"],
+                    "defines": ["OPENSSL_USE_NODELETE"] if self.options.shared else []
+                }
+            },
+            "properties": {
+                "cmake_find_module_name": "OpenSSL",
+                "cmake_target:crypto": "OpenSSL::Crypto",
+                "cmake_target:ssl": "OpenSSL::SSL",
+                "cmake_target:openssl": "OpenSSL::OpenSSL"
+            },
+            "system_libs": self._get_system_libs(),
+            "frameworks": self._get_frameworks()
+        }
+        
+        # Write CPS file to package folder
+        cps_file = os.path.join(self.package_folder, f"{self.name}.cps")
+        with open(cps_file, 'w') as f:
+            json.dump(cps_data, f, indent=2)
+        
+        self.output.info(f"Generated CPS file: {cps_file}")
+
+    def _get_system_libs(self):
+        """Get system libraries based on platform"""
+        if self.settings.os == "Linux":
+            return ["dl", "pthread"]
+        elif self.settings.os == "Windows":
+            return ["ws2_32", "gdi32", "advapi32", "crypt32", "user32"]
+        return []
+
+    def _get_frameworks(self):
+        """Get frameworks for macOS"""
+        if self.settings.os == "Macos":
+            return ["CoreFoundation", "Security"]
+        return []
 
     def log_upload_completion(self, remote_name: str = None):
         """Log package upload completion for CI/CD visibility."""

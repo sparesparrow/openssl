@@ -57,6 +57,9 @@ class TestPackageConan(ConanFile):
             # Test 6: Test that openssl_tools utilities are accessible
             self._test_tool_integration()
 
+            # Test 7: Validate CPS file generation
+            self._test_cps_generation()
+
     def _test_version_info(self):
         """Test version information for the component"""
         self.output.info(f"Testing component: {self.options.component}")
@@ -156,6 +159,71 @@ class TestPackageConan(ConanFile):
             self.output.info("✓ OpenSSL tools integration verified")
         except Exception as e:
             self.output.warning(f"OpenSSL tools integration test failed: {e}")
+
+    def _test_cps_generation(self):
+        """Test CPS file generation and format compliance"""
+        import json
+        from pathlib import Path
+        
+        self.output.info("Testing CPS file generation...")
+        
+        # Find the CPS file in the package
+        cps_file = None
+        for dep in self.dependencies.values():
+            if hasattr(dep, 'package_folder'):
+                potential_cps = Path(dep.package_folder) / "openssl.cps"
+                if potential_cps.exists():
+                    cps_file = potential_cps
+                    break
+        
+        if not cps_file:
+            self.output.warning("CPS file not found, skipping CPS validation")
+            return
+        
+        try:
+            # Load and validate CPS file
+            with open(cps_file) as f:
+                cps_data = json.load(f)
+            
+            # Validate CPS version
+            assert cps_data["cps_version"] == "0.13.0", f"Expected CPS version 0.13.0, got {cps_data['cps_version']}"
+            
+            # Validate required fields
+            required_fields = ["name", "version", "description", "license", "components", "properties"]
+            for field in required_fields:
+                assert field in cps_data, f"Missing required field: {field}"
+            
+            # Validate components
+            assert "crypto" in cps_data["components"], "Missing crypto component"
+            assert "ssl" in cps_data["components"], "Missing ssl component"
+            
+            crypto_comp = cps_data["components"]["crypto"]
+            ssl_comp = cps_data["components"]["ssl"]
+            
+            # Validate crypto component
+            assert crypto_comp["type"] == "library", "Crypto component should be type 'library'"
+            assert "@prefix@/lib/libcrypto.a" in crypto_comp["location"], "Invalid crypto library location"
+            assert "@prefix@/include" in crypto_comp["includes"], "Missing crypto include path"
+            
+            # Validate ssl component
+            assert ssl_comp["type"] == "library", "SSL component should be type 'library'"
+            assert "@prefix@/lib/libssl.a" in ssl_comp["location"], "Invalid SSL library location"
+            assert "@prefix@/include" in ssl_comp["includes"], "Missing SSL include path"
+            assert "crypto" in ssl_comp["requires"], "SSL component should require crypto"
+            
+            # Validate CMake targets
+            properties = cps_data["properties"]
+            assert properties["cmake_target:crypto"] == "OpenSSL::Crypto", "Invalid crypto CMake target"
+            assert properties["cmake_target:ssl"] == "OpenSSL::SSL", "Invalid SSL CMake target"
+            assert properties["cmake_target:openssl"] == "OpenSSL::OpenSSL", "Invalid OpenSSL CMake target"
+            
+            self.output.info("✓ CPS file validation passed")
+            self.output.info(f"✓ CPS file contains {len(cps_data['components'])} components")
+            self.output.info(f"✓ CPS file includes system libs: {cps_data.get('system_libs', [])}")
+            
+        except Exception as e:
+            self.output.error(f"✗ CPS file validation failed: {e}")
+            raise
 
     def _generate_test_sources(self):
         """Generate comprehensive test source files"""
