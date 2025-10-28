@@ -14,6 +14,10 @@ on:
       - 'test_package/**'
       - '.github/workflows/conan-integration-test.yml'
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   conan-test:
     name: Conan Package Test

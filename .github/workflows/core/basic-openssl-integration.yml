@@ -10,6 +10,11 @@ on:
   
   # Manual trigger for testing
   workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
     inputs:
       openssl_ref:
         description: 'OpenSSL git ref to build (branch/tag/commit)'

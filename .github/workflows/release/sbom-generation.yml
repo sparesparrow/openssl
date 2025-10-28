@@ -36,7 +36,7 @@ jobs:
         submodules: recursive
 
     - name: Setup Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.9'
 
@@ -97,7 +97,7 @@ jobs:
         fi
 
     - name: Upload SBOM
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: sbom-${{ matrix.os }}-${{ matrix.build_type }}-${{ matrix.shared }}-${{ matrix.fips }}
         path: ~/.conan2/p/b/openssl4.0.0-dev/_/_/package/sbom.json
@@ -190,7 +190,7 @@ jobs:
         EOF
 
     - name: Upload aggregated SBOM
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: aggregated-sbom
         path: aggregated-sbom.json

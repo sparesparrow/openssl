@@ -4,6 +4,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   fast-validation:
     name: Fast Validation (3-5 min)

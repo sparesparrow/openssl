@@ -26,6 +26,10 @@ on:
       - 'apps/**'
       - 'test/**'
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   core-validation:
     runs-on: ubuntu-latest
